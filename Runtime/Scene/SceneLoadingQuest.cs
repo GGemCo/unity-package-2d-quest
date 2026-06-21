@@ -1,11 +1,11 @@
-﻿using GGemCo2DCore;
+using GGemCo2DCore;
 using UnityEngine;
 
 namespace GGemCo2DQuest
 {
     /// <summary>
-    /// Quest 패키지의 런타임 부트스트랩(테이블/로컬라이징/리소스/정의 로딩)을
-    /// 로딩 씬 단계에 등록하는 씬 컴포넌트입니다.
+    /// Quest 패키지의 테이블, Localization, 설정 리소스 로딩 단계를
+    /// Core 로딩 씬에 등록하는 씬 컴포넌트입니다.
     /// </summary>
     /// <remarks>
     /// - Addressables 설정이 준비되지 않은 경우 PreIntro 씬으로 되돌립니다.
@@ -14,9 +14,6 @@ namespace GGemCo2DQuest
     /// </remarks>
     public class SceneLoadingQuest : DefaultScene
     {
-        // NOTE: 현재 코드에서는 사용되지 않지만, 향후 확장(참조 보관/제어)을 위해 남겨둔 필드일 수 있습니다.
-        private GameLoaderManager _gameLoaderManager;
-
         /// <summary>
         /// Addressables 로더 설정이 존재하지 않으면 PreIntro 씬으로 강제 이동합니다.
         /// </summary>
@@ -48,7 +45,7 @@ namespace GGemCo2DQuest
 
         /// <summary>
         /// 로딩 씬에서 실제 로딩이 시작되기 직전에 호출되며,
-        /// Quest 관련 로딩 스텝(테이블/로컬라이징/리소스/정의)을 등록합니다.
+        /// Quest 관련 테이블, Localization, 설정 리소스 로딩 스텝을 등록합니다.
         /// </summary>
         /// <param name="sender">로딩 스텝을 등록할 <see cref="GameLoaderManager"/>입니다.</param>
         /// <param name="e">로딩 시작 직전 이벤트 인자입니다.</param>
@@ -56,7 +53,7 @@ namespace GGemCo2DQuest
             GameLoaderManager sender,
             GameLoaderManager.EventArgsBeforeLoadStart e)
         {
-            // 설정 스크립터블 오브젝트 
+            // 설정 스크립터블 오브젝트
             /*
             var addrSettings = CompatObjectFind.FindFirst<AddressableLoaderSettingsQuest>() ??
                                new GameObject("AddressableLoaderSettingsQuest")
@@ -70,7 +67,7 @@ namespace GGemCo2DQuest
             );
             sender.Register(step);
             */
-            
+
             // 테이블 로더 준비 및 테이블 로딩 스텝 등록
             var tableLoader = CompatObjectFind.FindFirst<TableLoaderManagerQuest>() ??
                               new GameObject("TableLoaderManagerQuest").AddComponent<TableLoaderManagerQuest>();

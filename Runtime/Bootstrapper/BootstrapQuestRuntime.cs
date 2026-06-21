@@ -1,139 +1,202 @@
-using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using GGemCo2DCore;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-using SceneManager = UnityEngine.SceneManagement.SceneManager;
 
 namespace GGemCo2DQuest
 {
     /// <summary>
-    /// 로딩 단계와 게임 씬 생명주기에 Quest 패키지를 연결합니다.
+    /// Core 캐릭터 수명주기와 Quest NPC 표시 컴포넌트를 연결하는 런타임 부트스트랩입니다.
+    /// Quest 테이블과 Addressables 데이터 로딩은 <see cref="SceneLoadingQuest"/>가 담당합니다.
     /// </summary>
     public sealed class BootstrapQuestRuntime : MonoBehaviour
     {
-        private Coroutine _initializeCoroutine;
+        [SerializeField]
+        [Tooltip("NPC에 NpcQuestController가 없을 때 자동으로 추가할지 여부입니다.")]
+        private bool addIfMissing = true;
+
+        private readonly HashSet<Npc> _pendingNpcs = new HashSet<Npc>();
+        private QuestPackageManager _packageManager;
+        private bool _isSubscribed;
 
         /// <summary>
-        /// 씬 로드 전에 Quest 부트스트랩 오브젝트를 생성합니다.
+        /// Quest 패키지 매니저와 연결하고 보류 중인 NPC 초기화를 완료합니다.
         /// </summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void Install()
+        /// <param name="packageManager">Quest 데이터와 실행 매니저를 소유한 패키지 매니저입니다.</param>
+        public void Activate(QuestPackageManager packageManager)
         {
-            if (CompatObjectFind.FindFirst<BootstrapQuestRuntime>() != null)
+            if (packageManager == null)
             {
                 return;
             }
 
-            GameObject bootstrapObject = new GameObject(nameof(BootstrapQuestRuntime));
-            DontDestroyOnLoad(bootstrapObject);
-            bootstrapObject.AddComponent<BootstrapQuestRuntime>();
+            _packageManager = packageManager;
+            Subscribe();
+            FlushPendingNpcs();
         }
 
         /// <summary>
-        /// 로딩 시작 및 씬 로드 이벤트를 구독합니다.
+        /// Quest 패키지 연결을 해제하고 초기화 대기 중인 NPC 참조를 정리합니다.
+        /// </summary>
+        public void Deactivate()
+        {
+            Unsubscribe();
+            _pendingNpcs.Clear();
+            _packageManager = null;
+        }
+
+        /// <summary>
+        /// 컴포넌트가 활성화되면 캐릭터 활성화와 표시 갱신 이벤트를 구독합니다.
+        /// 패키지 매니저 초기화 전 수신한 NPC는 대기 목록에 보관합니다.
         /// </summary>
         private void OnEnable()
         {
-            GameLoaderManager.BeforeLoadStartInLoadingScene += HandleBeforeLoadStart;
-            SceneManager.sceneLoaded += HandleSceneLoaded;
+            Subscribe();
         }
 
         /// <summary>
-        /// 등록한 이벤트를 해제합니다.
+        /// 컴포넌트가 비활성화되면 모든 Core 이벤트 구독을 해제합니다.
         /// </summary>
         private void OnDisable()
         {
-            GameLoaderManager.BeforeLoadStartInLoadingScene -= HandleBeforeLoadStart;
-            SceneManager.sceneLoaded -= HandleSceneLoaded;
+            Unsubscribe();
         }
 
         /// <summary>
-        /// Quest 테이블 로딩 단계를 Core 로더에 등록합니다.
+        /// Core 캐릭터 이벤트와 표시 갱신 레지스트리를 중복 없이 구독합니다.
         /// </summary>
-        /// <param name="sender">게임 로더 매니저입니다.</param>
-        /// <param name="eventArgs">로딩 시작 이벤트 정보입니다.</param>
-        private void HandleBeforeLoadStart(
-            GameLoaderManager sender,
-            GameLoaderManager.EventArgsBeforeLoadStart eventArgs)
+        private void Subscribe()
         {
-            TableLoaderManagerQuest tableLoader =
-                CompatObjectFind.FindFirst<TableLoaderManagerQuest>();
-            if (tableLoader == null)
+            if (_isSubscribed)
             {
-                tableLoader = new GameObject(nameof(TableLoaderManagerQuest))
-                    .AddComponent<TableLoaderManagerQuest>();
+                return;
             }
 
-            var fallbackTables = new List<AddressableAssetInfo>
-            {
-                ConfigAddressableTableQuest.TableQuest,
-            };
-
-            sender.Register(new TablePackLoadStep(
-                id: "quest.table",
-                order: 248,
-                localizedKey: LocalizationConstants.Keys.Loading.TextTypeTables(),
-                tableLoader: tableLoader,
-                tablePack: null,
-                fallbackTables: fallbackTables));
+            CharacterManager.OnCharacterActivated += HandleCharacterActivated;
+            CharacterPresentationRefreshRegistry.Register(RefreshCharacterPresentation);
+            _isSubscribed = true;
         }
 
         /// <summary>
-        /// 게임 씬이 로드되면 Core 준비 완료 후 Quest 런타임을 초기화합니다.
+        /// Core 캐릭터 이벤트와 표시 갱신 레지스트리 구독을 해제합니다.
         /// </summary>
-        /// <param name="scene">로드된 씬입니다.</param>
-        /// <param name="mode">씬 로드 모드입니다.</param>
-        private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+        private void Unsubscribe()
         {
-            if (_initializeCoroutine != null)
+            if (!_isSubscribed)
             {
-                StopCoroutine(_initializeCoroutine);
+                return;
             }
 
-            _initializeCoroutine = StartCoroutine(InitializeWhenReady());
+            CharacterManager.OnCharacterActivated -= HandleCharacterActivated;
+            CharacterPresentationRefreshRegistry.Unregister(RefreshCharacterPresentation);
+            _isSubscribed = false;
         }
 
         /// <summary>
-        /// Core 게임 씬과 Quest 테이블 로더가 준비될 때까지 기다린 후 패키지 매니저를 초기화합니다.
+        /// 활성화가 완료된 NPC에 Quest 표시 컨트롤러를 연결합니다.
+        /// Quest 패키지 초기화 전이면 NPC를 보류 목록에 저장합니다.
         /// </summary>
-        private IEnumerator InitializeWhenReady()
+        /// <param name="character">Core 초기화가 완료된 캐릭터입니다.</param>
+        private void HandleCharacterActivated(CharacterBase character)
         {
-            while (SceneGame.Instance == null ||
-                   SceneGame.Instance.saveDataManager == null)
+            if (character is not Npc npc)
             {
-                yield return null;
+                return;
             }
 
-            TableLoaderManagerQuest tableLoader = TableLoaderManagerQuest.Instance;
-            if (tableLoader == null)
+            if (!IsPackageReady())
             {
-                tableLoader = new GameObject(nameof(TableLoaderManagerQuest))
-                    .AddComponent<TableLoaderManagerQuest>();
+                _pendingNpcs.Add(npc);
+                return;
+            }
 
-                // Game 씬을 직접 실행한 Editor 시나리오에서도 Quest 테이블을 준비합니다.
-                Task loadTask = tableLoader.LoadDataFile(ConfigAddressableTableQuest.TableQuest);
-                while (!loadTask.IsCompleted)
+            InitializeNpcController(npc);
+        }
+
+        /// <summary>
+        /// Core의 캐릭터 표시 갱신 요청을 NPC Quest 표시 컨트롤러에 전달합니다.
+        /// </summary>
+        /// <param name="character">표시 상태를 갱신할 캐릭터입니다.</param>
+        private void RefreshCharacterPresentation(CharacterBase character)
+        {
+            if (character is not Npc npc)
+            {
+                return;
+            }
+
+            NpcQuestController controller = npc.GetComponent<NpcQuestController>();
+            if (controller != null)
+            {
+                controller.LoadQuest();
+                return;
+            }
+
+            if (!IsPackageReady())
+            {
+                _pendingNpcs.Add(npc);
+                return;
+            }
+
+            InitializeNpcController(npc);
+        }
+
+        /// <summary>
+        /// Quest 패키지 초기화 전에 활성화된 NPC를 순회하여 표시 컨트롤러를 연결합니다.
+        /// 파괴된 Unity Object는 초기화 대상에서 제외합니다.
+        /// </summary>
+        private void FlushPendingNpcs()
+        {
+            if (!IsPackageReady() || _pendingNpcs.Count <= 0)
+            {
+                return;
+            }
+
+            foreach (Npc npc in _pendingNpcs)
+            {
+                if (npc == null)
                 {
-                    yield return null;
+                    continue;
                 }
 
-                if (loadTask.IsFaulted)
-                {
-                    GcLogger.LogException(loadTask.Exception);
-                }
+                InitializeNpcController(npc);
             }
 
-            QuestPackageManager packageManager =
-                GetComponent<QuestPackageManager>();
-            if (packageManager == null)
+            _pendingNpcs.Clear();
+        }
+
+        /// <summary>
+        /// NPC에 <see cref="NpcQuestController"/>를 보장하고 현재 Quest 데이터로 초기화합니다.
+        /// </summary>
+        /// <param name="npc">Quest 표시 기능을 연결할 NPC입니다.</param>
+        private void InitializeNpcController(Npc npc)
+        {
+            if (npc == null)
             {
-                packageManager = gameObject.AddComponent<QuestPackageManager>();
+                return;
             }
 
-            packageManager.InitializeForScene(SceneGame.Instance);
-            _initializeCoroutine = null;
+            NpcQuestController controller = npc.GetComponent<NpcQuestController>();
+            if (controller == null)
+            {
+                if (!addIfMissing)
+                {
+                    return;
+                }
+
+                controller = npc.gameObject.AddComponent<NpcQuestController>();
+            }
+
+            controller.Initialize(npc);
+        }
+
+        /// <summary>
+        /// NPC Quest 표시를 초기화할 수 있도록 패키지 데이터와 실행 매니저가 준비되었는지 확인합니다.
+        /// </summary>
+        /// <returns>Quest 런타임 사용 준비가 끝났으면 true를 반환합니다.</returns>
+        private bool IsPackageReady()
+        {
+            return _packageManager != null &&
+                   _packageManager.QuestData != null &&
+                   _packageManager.QuestManager != null;
         }
     }
 }
