@@ -107,7 +107,7 @@ namespace GGemCo2DQuestEditor
         private SaveDataContainer _saveDataContainer;
         private int _previousIndex;
         
-        [MenuItem(ConfigEditorQuest.NameToolQuest)]
+        [MenuItem(ConfigEditorQuest.NameToolQuest, false, (int)ConfigEditorQuest.ToolOrdering.CreateQuest)]
         public static void ShowWindow()
         {
             GetWindow<QuestEditorWindow>(ConfigEditorQuest.NameToolQuest);

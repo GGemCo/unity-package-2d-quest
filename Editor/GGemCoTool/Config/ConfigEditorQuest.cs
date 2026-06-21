@@ -28,23 +28,13 @@ namespace GGemCo2DQuestEditor
             /// <summary>Addressables 셋팅 메뉴 섹션의 시작 위치입니다.</summary>
             SettingAddressable,
 
-            /// <summary>Pre-Intro 씬 셋팅 메뉴 섹션의 시작 위치입니다.</summary>
-            SettingScenePreIntro,
-
-            /// <summary>로딩 씬 셋팅 메뉴 섹션의 시작 위치입니다.</summary>
-            SettingSceneLoading,
-
-            /// <summary>게임 씬 셋팅 메뉴 섹션의 시작 위치입니다.</summary>
-            SettingSceneGame,
-
             /// <summary>개발 도구 메뉴 섹션의 시작 위치입니다.</summary>
             Development = 100,
+            CreateQuest,
 
             /// <summary>테스트 도구 메뉴 섹션의 시작 위치입니다.</summary>
             Test = 200,
-            UseQuest,
             Debug = 300,
-            DebugQuestDescription,
 
             /// <summary>기타 도구 메뉴 섹션의 시작 위치입니다.</summary>
             Etc = 900,
@@ -78,24 +68,11 @@ namespace GGemCo2DQuestEditor
         public const string NameToolSettingAddressable = NameToolSettings + "Addressable 셋팅하기";
 
         /// <summary>
-        /// "Pre 인트로 씬 셋팅하기" 메뉴 경로입니다.
-        /// </summary>
-        public const string NameToolSettingScenePreIntro = NameToolSettings + "Pre 인트로 씬 셋팅하기";
-
-        /// <summary>
-        /// "로딩 씬 셋팅하기" 메뉴 경로입니다.
-        /// </summary>
-        public const string NameToolSettingSceneLoading = NameToolSettings + "로딩 씬 셋팅하기";
-
-        /// <summary>
-        /// "게임 씬 셋팅하기" 메뉴 경로입니다.
-        /// </summary>
-        public const string NameToolSettingSceneGame = NameToolSettings + "게임 씬 셋팅하기";
-
-        /// <summary>
         /// 개발툴 메뉴의 경로 접두사입니다.
         /// </summary>
         private const string NameToolDevelopment = NameToolGGemCoQuest + "개발툴/";
+
+        public const string NameToolQuest = NameToolDevelopment + "퀘스트 생성툴";
 
         /// <summary>
         /// 테스트툴 메뉴의 경로 접두사입니다.
@@ -104,8 +81,6 @@ namespace GGemCo2DQuestEditor
         /// NOTE: 현재 문자열이 "테스트툴"로 되어 있는데, 의도한 표기가 "테스트툴"이라면 수정이 필요합니다.
         /// </remarks>
         private const string NameToolTest = NameToolGGemCoQuest + "테스트툴/";
-
-        public const string NameToolQuest = NameToolTest + "퀘스트 생성툴";
         
         // 디버그
         private const string NameToolDebug = NameToolGGemCoQuest + "디버그툴/";
