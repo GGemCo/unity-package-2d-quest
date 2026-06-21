@@ -24,6 +24,11 @@ namespace GGemCo2DQuest
         /// </summary>
         public QuestManager QuestManager { get; private set; }
 
+        /// <summary>
+        /// Quest 전용 저장 파일의 복원과 저장을 담당하는 매니저입니다.
+        /// </summary>
+        public SaveDataManagerQuest SaveDataManagerQuest { get; private set; }
+
         private SceneGame _sceneGame;
         private BootstrapQuestRuntime _bootstrapRuntime;
         private QuestInteractionChoiceContributor _interactionContributor;
@@ -109,8 +114,37 @@ namespace GGemCo2DQuest
             DeinitializeScene();
             _sceneGame = sceneGame;
 
-            QuestData = new QuestData();
-            QuestData.Register();
+            GameObject managerContainer = GameObject.Find("Managers");
+            if (managerContainer == null)
+            {
+                GcLogger.LogError("Quest 저장 매니저를 생성할 Managers 오브젝트가 없습니다.");
+                Destroy(gameObject);
+                return;
+            }
+
+            SaveDataManagerQuest = sceneGame.CreateManager<SaveDataManagerQuest>(managerContainer);
+            SaveDataManagerQuest.Initialize(new GameInitContext(
+                sceneGame,
+                TableLoaderManager.Instance,
+                AddressableLoaderSettings.Instance));
+            if (!SaveDataManagerQuest.IsInitialized)
+            {
+                GcLogger.LogError("Quest 저장 매니저를 초기화하지 못했습니다.");
+                Destroy(SaveDataManagerQuest.gameObject);
+                SaveDataManagerQuest = null;
+                Destroy(gameObject);
+                return;
+            }
+
+            QuestData = SaveDataManagerQuest.Quest;
+            if (QuestData == null)
+            {
+                GcLogger.LogError("Quest 저장 데이터를 초기화하지 못했습니다.");
+                Destroy(SaveDataManagerQuest.gameObject);
+                SaveDataManagerQuest = null;
+                Destroy(gameObject);
+                return;
+            }
 
             QuestManager = new QuestManager();
             QuestManager.Initialize(sceneGame, QuestData);
@@ -153,8 +187,14 @@ namespace GGemCo2DQuest
             QuestManager?.OnDestroy();
             QuestData?.Unregister();
 
+            if (SaveDataManagerQuest != null)
+            {
+                Destroy(SaveDataManagerQuest.gameObject);
+            }
+
             QuestManager = null;
             QuestData = null;
+            SaveDataManagerQuest = null;
             _interactionContributor = null;
             _respawnPolicy = null;
             _sceneGame = null;

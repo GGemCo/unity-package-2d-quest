@@ -83,6 +83,16 @@ namespace GGemCo2DQuest
             );
             sender.Register(stepTable);
 
+            // Quest 전용 저장 파일 로더를 준비하고 Core 저장 파일 다음 순서로 로드합니다.
+            var saveDataLoader = CompatObjectFind.FindFirst<SaveDataLoaderQuest>() ??
+                                 new GameObject(nameof(SaveDataLoaderQuest)).AddComponent<SaveDataLoaderQuest>();
+            var saveDataStep = new SaveDataLoadStep(
+                id: "core.savedata.quest",
+                order: 382,
+                localizedKey: LocalizationConstants.Keys.Loading.TextTypeSaveData(),
+                saveDataLoader: saveDataLoader);
+            sender.Register(saveDataStep);
+
             // 로컬라이징 매니저 준비 및 로컬라이징 로딩 스텝 등록
             /*
             var loc =

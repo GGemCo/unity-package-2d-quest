@@ -370,25 +370,103 @@ namespace GGemCo2DQuestEditor
         {
             bool result = EditorUtility.DisplayDialog("초기화", "현재 플레이한 퀘스트 정보가 초기화 됩니다.\n계속 진행할가요?", "네", "아니요");
             if (!result) return;
-            
+
             int slotIndex = PlayerPrefsManager.LoadSaveDataSlotIndex();
-            SaveFileController saveFileController = new SaveFileController(_saveDirectory, _maxSlotCount);
-            string filePath = saveFileController.GetSaveFilePath(slotIndex);
-            string json = File.ReadAllText(filePath);
-            if (json != "")
+            if (slotIndex <= 0 || _maxSlotCount <= 0 || string.IsNullOrWhiteSpace(_saveDirectory))
             {
-                _saveDataContainer = JsonConvert.DeserializeObject<SaveDataContainer>(json);
+                EditorUtility.DisplayDialog(
+                    ConfigEditorQuest.NameToolQuest,
+                    "저장 슬롯 또는 저장 경로 설정이 유효하지 않습니다.",
+                    "OK");
+                return;
             }
 
+            SaveFileController saveFileController = new SaveFileController(_saveDirectory, _maxSlotCount);
+            try
+            {
+                ResetCoreQuestExtension(saveFileController, slotIndex);
+                ResetQuestSaveFile(saveFileController, slotIndex);
+            }
+            catch (Exception exception)
+            {
+                GcLogger.LogException(exception);
+                EditorUtility.DisplayDialog(
+                    ConfigEditorQuest.NameToolQuest,
+                    $"퀘스트 진행 정보 초기화 중 오류가 발생했습니다.\n{exception.Message}",
+                    "OK");
+                return;
+            }
+
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog(ConfigEditorQuest.NameToolQuest, "퀘스트 플레이 정보 초기화 완료", "OK");
+        }
+
+        /// <summary>
+        /// 기존 Core 저장 파일의 quest.progress 확장 섹션을 초기화합니다.
+        /// Quest 전용 저장 파일 도입 이전 데이터와의 하위 호환을 위해 함께 정리합니다.
+        /// </summary>
+        /// <param name="saveFileController">저장 파일 경로를 계산할 컨트롤러입니다.</param>
+        /// <param name="slotIndex">초기화할 저장 슬롯 번호입니다.</param>
+        private void ResetCoreQuestExtension(SaveFileController saveFileController, int slotIndex)
+        {
+            string filePath = saveFileController.GetSaveFilePath(slotIndex);
+            if (!File.Exists(filePath))
+            {
+                return;
+            }
+
+            string json = SaveDataFileService.ReadAllText(filePath, SaveDataIdentity.Core(slotIndex));
+            _saveDataContainer = JsonConvert.DeserializeObject<SaveDataContainer>(json) ??
+                                 new SaveDataContainer();
             _saveDataContainer.Extensions ??= new Dictionary<string, JToken>();
-            _saveDataContainer.Extensions[QuestData.SaveSectionKey] = JObject.FromObject(new
+            _saveDataContainer.Extensions[QuestData.SaveSectionKey] = CreateEmptyQuestProgressToken();
+
+            string updatedJson = JsonConvert.SerializeObject(_saveDataContainer);
+            SaveDataFileService.WriteAllText(
+                filePath,
+                updatedJson,
+                SaveDataIdentity.Core(slotIndex));
+        }
+
+        /// <summary>
+        /// Quest 전용 저장 파일의 진행 데이터와 호환 확장 섹션을 초기화합니다.
+        /// </summary>
+        /// <param name="saveFileController">저장 파일 경로를 계산할 컨트롤러입니다.</param>
+        /// <param name="slotIndex">초기화할 저장 슬롯 번호입니다.</param>
+        private static void ResetQuestSaveFile(SaveFileController saveFileController, int slotIndex)
+        {
+            string filePath = saveFileController.GetSaveFilePath(
+                slotIndex,
+                SaveDataConstantsQuest.SaveDataFileName);
+            if (!File.Exists(filePath))
+            {
+                return;
+            }
+
+            SaveDataIdentity identity = SaveDataConstantsQuest.CreateIdentity(slotIndex);
+            string json = SaveDataFileService.ReadAllText(filePath, identity);
+            SaveDataContainerQuest container =
+                JsonConvert.DeserializeObject<SaveDataContainerQuest>(json) ??
+                new SaveDataContainerQuest();
+
+            container.QuestData = new QuestData();
+            container.Extensions ??= new Dictionary<string, JToken>();
+            container.Extensions[QuestData.SaveSectionKey] = CreateEmptyQuestProgressToken();
+
+            string updatedJson = JsonConvert.SerializeObject(container);
+            SaveDataFileService.WriteAllText(filePath, updatedJson, identity);
+        }
+
+        /// <summary>
+        /// 비어 있는 Quest 진행 데이터 확장 섹션 토큰을 생성합니다.
+        /// </summary>
+        /// <returns>빈 QuestDatas 사전을 포함한 JSON 토큰입니다.</returns>
+        private static JToken CreateEmptyQuestProgressToken()
+        {
+            return JObject.FromObject(new
             {
                 QuestDatas = new Dictionary<int, QuestSaveData>(),
             });
-            json = JsonConvert.SerializeObject(_saveDataContainer);
-            File.WriteAllText(filePath, json);
-            AssetDatabase.Refresh();
-            EditorUtility.DisplayDialog(ConfigEditorQuest.NameToolQuest, "퀘스트 플레이 정보 초기화 완료", "OK");
         }
         /// <summary>
         /// json 으로 저장하기

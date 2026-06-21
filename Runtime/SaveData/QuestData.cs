@@ -59,6 +59,23 @@ namespace GGemCo2DQuest
         public string SectionKey => SaveSectionKey;
 
         /// <summary>
+        /// Quest 전용 저장 파일에서 로드한 진행 데이터를 현재 런타임 데이터에 반영합니다.
+        /// 전용 저장 데이터가 없으면 먼저 복원된 Core 확장 섹션 데이터를 유지합니다.
+        /// </summary>
+        /// <param name="saveDataContainer">로딩 씬에서 역직렬화한 Quest 저장 컨테이너입니다.</param>
+        public void Initialize(SaveDataContainerQuest saveDataContainer)
+        {
+            Dictionary<int, QuestSaveData> loadedQuestDatas =
+                saveDataContainer?.QuestData?.QuestDatas;
+            if (loadedQuestDatas == null)
+            {
+                return;
+            }
+
+            QuestDatas = new Dictionary<int, QuestSaveData>(loadedQuestDatas);
+        }
+
+        /// <summary>
         /// Quest 저장 기여자를 Core 저장 레지스트리에 등록합니다.
         /// 레지스트리에 보류된 복원 데이터가 있으면 등록 즉시 복원됩니다.
         /// </summary>
@@ -151,6 +168,14 @@ namespace GGemCo2DQuest
                     QuestWindowConstants.HudQuest);
             _uiWindowHudQuest?.SetCount(questUid, count);
             SaveDatas();
+        }
+
+        /// <summary>
+        /// Quest 진행 데이터 변경 시 Quest 전용 저장 매니저에 저장을 요청합니다.
+        /// </summary>
+        protected override void SaveDatas()
+        {
+            QuestPackageManager.Instance?.SaveDataManagerQuest?.StartSaveData();
         }
 
         protected override int GetMaxSlotCount()
