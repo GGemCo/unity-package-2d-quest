@@ -28,13 +28,13 @@ namespace GGemCo2DQuestEditor
             yield return TableEditorDefinitionFactory.Create(
                 ModuleName,
                 PackageName,
-                ConfigAddressableQuest.TableName,
-                ConfigAddressableQuest.TableQuest.Path,
-                ConfigAddressableQuest.TableName,
+                ConfigAddressableTableQuest.Quest,
+                ConfigAddressableTableQuest.TableQuest.Path,
+                ConfigAddressableTableQuest.Quest,
                 typeof(TableQuest),
                 typeof(StruckTableQuest),
                 TableEditorDefinitionFactory.CreateDefaultReloadAction(
-                    ConfigAddressableQuest.TableQuest.Path),
+                    ConfigAddressableTableQuest.TableQuest.Path),
                 TableEditorRegistry.FindReferenceTable);
         }
     }

@@ -16,7 +16,7 @@ namespace GGemCo2DQuestEditor
         public static TableQuest LoadQuestTable(bool forceReload = true)
         {
             return TableLoaderManagerBase.LoadTable<TableQuest>(
-                ConfigAddressableQuest.TableQuest.Path,
+                ConfigAddressableTableQuest.TableQuest.Path,
                 forceReload);
         }
     }

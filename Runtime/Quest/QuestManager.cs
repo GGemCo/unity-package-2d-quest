@@ -224,7 +224,7 @@ namespace GGemCo2DQuest
 
             var info = _tableQuest.GetDataByUid(questUid);
             if (info == null) return null;
-            string key = ConfigAddressableQuest.GetQuestKey(info.Uid);
+            string key = ConfigAddressableTableQuest.GetQuestKey(info.Uid);
             try
             {
                 TextAsset textFile = await AddressableLoaderController.LoadByKeyAsync<TextAsset>(key);

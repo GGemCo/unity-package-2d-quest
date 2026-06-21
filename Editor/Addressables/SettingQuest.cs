@@ -1,8 +1,7 @@
-using GGemCo2DQuest;
-using GGemCo2DCoreEditor;
 using System.Collections.Generic;
 using System.IO;
-using GGemCo2DCore;
+using GGemCo2DCoreEditor;
+using GGemCo2DQuest;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
@@ -16,28 +15,33 @@ namespace GGemCo2DQuestEditor
     public class SettingQuest : DefaultAddressable
     {
         private const string Title = "퀘스트 추가하기";
+        
+        /// <summary>
+        /// UI 레이아웃(버튼 폭/높이 등) 정보를 제공하는 부모 에디터 윈도우 참조입니다.
+        /// </summary>
+        private readonly AddressableEditorQuest _addressableEditor;
+        
         /// <summary>
         /// Quest Addressables 설정 모듈을 생성합니다.
         /// </summary>
-        public SettingQuest()
+        public SettingQuest(AddressableEditorQuest addressableEditorWindow)
         {
-            targetGroupName = ConfigAddressableQuest.GroupName;
+            _addressableEditor = addressableEditorWindow;
+            targetGroupName = ConfigAddressableGroupNameQuest.Quest;
         }
 
         /// <summary>
         /// Quest Addressables 설정 버튼을 그립니다.
         /// </summary>
-        /// <param name="buttonWidth">버튼 폭입니다.</param>
-        /// <param name="buttonHeight">버튼 높이입니다.</param>
-        public void OnGUI(float buttonWidth, float buttonHeight)
+        public void OnGUI()
         {
-            if (!File.Exists(ConfigAddressableQuest.TableQuest.Path))
+            if (!File.Exists(ConfigAddressableTableQuest.TableQuest.Path))
             {
-                EditorGUILayout.HelpBox($"{ConfigAddressableQuest.TableName} 테이블이 없습니다.", MessageType.Info);
+                EditorGUILayout.HelpBox($"{ConfigAddressableTableQuest.Quest} 테이블이 없습니다.", MessageType.Info);
             }
             else
             {
-                if (GUILayout.Button(Title, GUILayout.Width(buttonWidth), GUILayout.Height(buttonHeight)))
+                if (GUILayout.Button(Title, GUILayout.Width(_addressableEditor.buttonWidth), GUILayout.Height(_addressableEditor.buttonHeight)))
                 {
                     try
                     {
@@ -84,23 +88,15 @@ namespace GGemCo2DQuestEditor
             
             ClearGroupEntries(settings, group);
 
-            // Quest 전용 테이블도 같은 그룹에 등록하여 Core 테이블 설정과 독립적으로 로드할 수 있게 합니다.
-            Add(
-                settings,
-                group,
-                ConfigAddressableQuest.TableQuest.Key,
-                ConfigAddressableQuest.TableQuest.Path,
-                ConfigAddressableLabel.Table);
-            
             // foreach 문을 사용하여 딕셔너리 내용을 출력
             foreach (KeyValuePair<int, StruckTableQuest> outerPair in dictionary)
             {
                 var info = outerPair.Value;
                 if (info.Uid <= 0) continue;
             
-                string key = ConfigAddressableQuest.GetQuestKey(info.Uid);
-                string assetPath = $"{ConfigAddressableQuest.QuestJsonPath}/{info.FileName}.json";
-                string label = ConfigAddressableQuest.Label;
+                string key = $"{ConfigAddressableKeyQuest.Quest}_{info.Uid}";
+                string assetPath = $"{ConfigAddressablePathQuest.Quest.RootQuest}/{info.FileName}.json";
+                string label = ConfigAddressableLabelQuest.Quest;
             
                 Add(settings, group, key, assetPath, label);
             }

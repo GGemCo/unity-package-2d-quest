@@ -68,7 +68,7 @@ namespace GGemCo2DQuest
 
             var fallbackTables = new List<AddressableAssetInfo>
             {
-                ConfigAddressableQuest.TableQuest,
+                ConfigAddressableTableQuest.TableQuest,
             };
 
             sender.Register(new TablePackLoadStep(
@@ -113,7 +113,7 @@ namespace GGemCo2DQuest
                     .AddComponent<TableLoaderManagerQuest>();
 
                 // Game 씬을 직접 실행한 Editor 시나리오에서도 Quest 테이블을 준비합니다.
-                Task loadTask = tableLoader.LoadDataFile(ConfigAddressableQuest.TableQuest);
+                Task loadTask = tableLoader.LoadDataFile(ConfigAddressableTableQuest.TableQuest);
                 while (!loadTask.IsCompleted)
                 {
                     yield return null;

@@ -22,7 +22,7 @@ namespace GGemCo2DQuest
     /// </summary>
     public class TableQuest : DefaultTable<StruckTableQuest>
     {
-        public override string Key => ConfigAddressableQuest.TableName;
+        public override string Key => ConfigAddressableTableQuest.Quest;
         private static readonly Dictionary<int, Dictionary<int, List<int>>> QuestUidsByNpc = new Dictionary<int, Dictionary<int, List<int>>>();
         private static readonly Dictionary<int, List<int>> QuestUidsByEnterMap = new Dictionary<int, List<int>>();
 
