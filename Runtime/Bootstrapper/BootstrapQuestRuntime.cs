@@ -11,7 +11,7 @@ namespace GGemCo2DQuest
     /// <summary>
     /// 로딩 단계와 게임 씬 생명주기에 Quest 패키지를 연결합니다.
     /// </summary>
-    public sealed class QuestRuntimeBootstrap : MonoBehaviour
+    public sealed class BootstrapQuestRuntime : MonoBehaviour
     {
         private Coroutine _initializeCoroutine;
 
@@ -21,14 +21,14 @@ namespace GGemCo2DQuest
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Install()
         {
-            if (CompatObjectFind.FindFirst<QuestRuntimeBootstrap>() != null)
+            if (CompatObjectFind.FindFirst<BootstrapQuestRuntime>() != null)
             {
                 return;
             }
 
-            GameObject bootstrapObject = new GameObject(nameof(QuestRuntimeBootstrap));
+            GameObject bootstrapObject = new GameObject(nameof(BootstrapQuestRuntime));
             DontDestroyOnLoad(bootstrapObject);
-            bootstrapObject.AddComponent<QuestRuntimeBootstrap>();
+            bootstrapObject.AddComponent<BootstrapQuestRuntime>();
         }
 
         /// <summary>
