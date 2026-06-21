@@ -1,4 +1,4 @@
-# Quest 패키지 핵심 클래스 정리
+# Quest 패키지 구조와 핵심 클래스 정리
 
 ## 1. 문서 목적
 
@@ -24,10 +24,12 @@ Core는 Quest를 직접 참조하지 않고, Quest가 Core의 공통 포트와 �
 
 핵심 책임은 다음과 같습니다.
 
-* Quest 테이블 로딩과 Quest JSON 정의 로딩
+* Quest 테이블 전체 선로드와 Quest JSON 지연 로딩
+* 진행 중 Quest 우선 복원, 현재 맵 후보 프리로드, LRU 정의 캐시
 * 퀘스트 시작 조건 처리(`TalkToNpc`, `EnterMap`)
 * 목표 단계 처리(`TalkToNpc`, `KillMonster`, `KillMonsterInMap`, `CollectItem`, `EnterMap`, `ReachPosition`, `PlayCutscene`)
-* 퀘스트 진행 상태 저장/복원
+* Quest 전용 저장 파일(`SaveDataQuest.json`) 저장/복원
+* 기존 Core `quest.progress` 확장 섹션 하위 호환 복원
 * NPC 퀘스트 아이콘과 상호작용 선택지 제공
 * 진행 중 Quest HUD와 보상 UI 표시
 * Quest JSON 제작, 단계 편집, 보상 편집, Addressables 설정 툴 제공
@@ -44,18 +46,24 @@ Core는 Quest를 직접 참조하지 않고, Quest가 Core의 공통 포트와 �
 `Bootstrapper/BootstrapQuestRuntime.cs`
 
 **역할**
-Quest 패키지를 Core 로딩 단계와 Game 씬 생명주기에 연결하는 자동 부트스트랩입니다.
+Core 캐릭터 수명주기와 Quest NPC 표시 컴포넌트를 연결하는 런타임 부트스트랩입니다.
 
 **주요 책임**
 
-* `RuntimeInitializeOnLoadMethod`로 부트스트랩 오브젝트 생성
-* `GameLoaderManager.BeforeLoadStartInLoadingScene` 구독
-* Quest 테이블 로딩 스텝(`quest.table`) 등록
-* Game 씬 로드 후 `SceneGame`과 `TableLoaderManagerQuest`가 준비될 때까지 대기
-* `QuestPackageManager`를 생성/초기화
+* `CharacterManager.OnCharacterActivated` 구독
+* NPC에 `NpcQuestController`가 없으면 자동 연결
+* Quest 패키지 초기화 전에 활성화된 NPC를 대기 목록으로 관리
+* `CharacterPresentationRefreshRegistry`를 통한 NPC Quest 표시 갱신
+* 활성화/비활성화 시 Core 이벤트 구독과 대기 참조 정리
 
 **왜 중요한가**
-Quest가 Core 내부에 들어가지 않고도 로딩 파이프라인과 게임 씬에 붙을 수 있게 하는 핵심 진입점입니다.
+Quest 전용 캐릭터 표현 로직을 `QuestPackageManager`에서 분리하고, Core 캐릭터에 대한 연결 책임을 한곳에 모읍니다.
+
+**책임 경계**
+
+* Quest 테이블과 저장 파일을 직접 로드하지 않습니다.
+* 씬을 감시하거나 `QuestPackageManager`를 자동 생성하지 않습니다.
+* 데이터 로딩은 `SceneLoadingQuest`, Quest 서비스 수명주기는 `QuestPackageManager`가 담당합니다.
 
 ---
 
@@ -65,20 +73,22 @@ Quest가 Core 내부에 들어가지 않고도 로딩 파이프라인과 게임 
 `Core/QuestPackageManager.cs`
 
 **역할**
-Quest 런타임 데이터, `QuestManager`, Core 연동 객체의 수명주기를 관리합니다.
+Quest 런타임 데이터, 전용 저장 매니저, `QuestManager`, Core 확장 정책과 NPC 부트스트랩의 수명주기를 관리합니다.
 
 **주요 책임**
 
-* `QuestData` 생성 및 `SaveRegistry` 등록
+* Game 씬 단위 싱글톤 등록과 `BootstrapQuestRuntime` 컴포넌트 보장
+* `SceneGame`, Core 저장 매니저, Quest 테이블 로더 준비 대기
+* `SaveDataManagerQuest` 생성과 초기화
+* `SaveDataManagerQuest`에서 복원한 `QuestData` 연결
 * `QuestManager` 생성과 `SceneGame` 연결
 * `QuestInteractionChoiceContributor` 등록
 * `QuestMonsterRespawnSuppressionPolicy` 등록
-* NPC 캐릭터 활성화 시 `NpcQuestController` 자동 연결
-* Core 캐릭터 표시 갱신 요청을 NPC Quest 표시로 전달
-* Game 씬 종료 시 Quest 런타임 연결 해제
+* `BootstrapQuestRuntime` 활성화
+* Game 씬 종료 시 패키지 오브젝트와 모든 Quest 런타임 연결 정리
 
 **왜 중요한가**
-Quest 패키지와 Core 사이의 실제 연결 지점입니다. Core는 Quest를 참조하지 않고, Quest가 Core 레지스트리에 구현체를 등록합니다.
+Quest 패키지와 Core 사이의 서비스 조립 지점입니다. Core는 Quest를 참조하지 않고, Quest가 Core 레지스트리에 구현체를 등록하고 제거합니다.
 
 ---
 
@@ -88,16 +98,41 @@ Quest 패키지와 Core 사이의 실제 연결 지점입니다. Core는 Quest�
 `Scene/SceneLoadingQuest.cs`
 
 **역할**
-로딩 씬에서 Quest 관련 로딩 스텝을 등록하는 씬 컴포넌트입니다.
+로딩 씬에서 Quest 테이블과 전용 저장 파일 로딩 스텝을 등록하는 씬 컴포넌트입니다.
 
 **주요 책임**
 
 * Addressables 설정 준비 여부 확인
 * 로딩 시작 직전 이벤트 훅 구독
-* Quest 테이블/리소스 로딩 흐름을 GameLoaderManager에 연결
+* `TableLoaderManagerQuest` 준비
+* Quest 테이블 팩 또는 개별 테이블 로딩 단계 등록
+* `SaveDataLoaderQuest` 준비
+* Quest 전용 저장 파일 로딩 단계(`core.savedata.quest`) 등록
+* 향후 Quest Localization/Settings 로딩 단계 확장 위치 제공
 
 **왜 중요한가**
-자동 부트스트랩 외에 씬 구성 기반으로 Quest 로딩 흐름을 명시하고 싶을 때 기준이 됩니다.
+Quest 데이터 로딩의 단일 진입점입니다. `BootstrapQuestRuntime`이나 `QuestPackageManager`에서 테이블을 다시 로드하지 않도록 책임을 유지해야 합니다.
+
+### Runtime 초기화 흐름
+
+```text
+[Loading Scene]
+SceneLoadingQuest
+  → TableLoaderManagerQuest 생성
+  → quest 테이블 전체 로드
+  → SaveDataLoaderQuest로 SaveDataQuest.json 로드
+
+[Game Scene]
+QuestPackageManager
+  → SaveDataManagerQuest 생성/복원
+  → QuestManager 생성
+  → Core 확장 정책 등록
+  → BootstrapQuestRuntime 활성화
+
+[NPC Activated]
+BootstrapQuestRuntime
+  → NpcQuestController 연결/초기화
+```
 
 ---
 
@@ -142,9 +177,10 @@ Quest 패키지 전용 테이블을 등록하고 조회하는 테이블 로더�
 
 * `GetQuestsByNpcUid(mapUid, npcUid)`
 * `GetQuestsByEnterMap(mapUid)`
+* `GetQuestsByMap(mapUid)`
 
 **왜 중요한가**
-퀘스트가 어떤 NPC 대화나 맵 입장으로 시작되는지 결정하는 데이터 진입점입니다.
+퀘스트가 어떤 NPC 대화나 맵 입장으로 시작되는지 결정하는 데이터 진입점이며, 현재 맵 Quest JSON 프리로드 후보를 구성하는 카탈로그입니다.
 
 ---
 
@@ -212,7 +248,84 @@ Quest JSON 한 건의 단계와 보상 정의를 보관합니다.
 
 ---
 
-## 3-3. 진행 관리 / 저장
+## 3-3. Quest JSON Repository / 캐시
+
+### `IQuestDefinitionRepository`
+
+**위치**
+`Quest/IQuestDefinitionRepository.cs`
+
+**역할**
+Quest JSON 정의 조회, 프리로드, 활성 상태와 캐시 수명주기의 계약입니다.
+
+**주요 API**
+
+* `GetAsync(questUid)`
+* `PreloadAsync(questUids, mapUid)`
+* `TryGet(questUid, out quest)`
+* `MarkActive(questUid)`
+* `MarkInactive(questUid)`
+* `ReleaseUnused(mapUid)`
+
+---
+
+### `QuestDefinitionRepository`
+
+**위치**
+`Quest/QuestDefinitionRepository.cs`
+
+**역할**
+`TableQuest`를 JSON 카탈로그로 사용하여 Quest 정의를 지연 로드하고 캐시에 보관합니다.
+
+**주요 책임**
+
+* 동일 Quest UID의 동시 로드 요청 병합
+* `QuestJsonAddressableLoader`를 통한 JSON 로드
+* Quest UID, 목표 단계, 대상 UID, 맵 UID, 보상 수량 최소 검증
+* Active / Preload / Recent 캐시 상태 변경
+* 저장소 폐기 후 완료되는 비동기 요청의 캐시 반영 차단
+
+---
+
+### `QuestJsonAddressableLoader`
+
+**위치**
+`Quest/QuestJsonAddressableLoader.cs`
+
+**역할**
+Quest JSON `TextAsset`을 Addressables에서 로드하고 `Quest` 객체로 역직렬화합니다.
+
+**중요한 수명주기**
+
+```text
+TextAsset 로드
+  → JSON 문자열 읽기
+  → Quest 역직렬화
+  → Addressables handle 즉시 Release
+  → 순수 C# Quest 정의만 캐시에 보관
+```
+
+---
+
+### `QuestDefinitionCache`
+
+**위치**
+`Quest/QuestDefinitionCache.cs`
+
+**역할**
+파싱된 Quest 정의를 Active, Preload, Recent 상태로 분류하고 LRU 순서로 관리합니다.
+
+**캐시 정책**
+
+* Active: 진행 중 Quest이며 자동 제거하지 않음
+* Preload: 현재 맵에서 시작될 가능성이 있는 Quest
+* Recent: 최근 조회된 비활성 Quest
+* 기본 비활성 캐시 한도: 50개
+* 맵 변경 시 이전 맵 Preload 표시를 해제하고 LRU 한도 기준으로 정리
+
+---
+
+## 3-4. 진행 관리 / 저장
 
 ### `QuestManager`
 
@@ -224,9 +337,10 @@ Quest JSON 한 건의 단계와 보상 정의를 보관합니다.
 
 **주요 책임**
 
-* Quest JSON 전체 로딩
-* 저장된 진행 중 Quest 복원
+* 저장된 진행 중 Quest JSON만 초기 로드
+* 진행 중 Quest 정의를 Active 캐시로 고정
 * 맵 입장 이벤트 기반 Quest 시작
+* 현재 맵 Quest JSON 후보의 비동기 프리로드
 * NPC 대화 기반 Quest 시작
 * 목표 처리기 시작/해제
 * 목표 완료 요청 큐 처리
@@ -236,6 +350,63 @@ Quest JSON 한 건의 단계와 보상 정의를 보관합니다.
 
 **왜 중요한가**
 Quest 패키지의 실질적인 실행 오케스트레이터입니다. 버그가 “퀘스트가 시작되지 않는다”, “완료되지 않는다”, “보상이 지급되지 않는다” 유형이라면 가장 먼저 확인해야 합니다.
+
+**주의점**
+
+* Addressables와 JSON 파싱을 직접 처리하지 않고 `IQuestDefinitionRepository`에 위임합니다.
+* 완료된 Quest는 Active 캐시에서 해제하여 LRU 정리 대상이 됩니다.
+* 맵 진입 처리는 프리로드 완료를 기다리지 않습니다.
+
+---
+
+### `SaveDataManagerQuest`
+
+**위치**
+`SaveData/SaveDataManagerQuest.cs`
+
+**역할**
+Quest 진행 데이터의 생성, 복원과 Quest 전용 파일 저장을 담당합니다.
+
+**주요 책임**
+
+* `QuestData` 생성 및 `SaveRegistry` 등록
+* `SaveDataLoaderQuest`가 읽은 전용 저장 데이터 복원
+* 기존 Core `quest.progress` 확장 섹션을 하위 호환 폴백으로 사용
+* 진행 상태 변경 시 `SaveDataQuest.json` 저장
+* Quest 패키지 종료 시 저장 기여자 등록 해제
+
+---
+
+### `SaveDataLoaderQuest`
+
+**위치**
+`SaveData/SaveDataLoaderQuest.cs`
+
+**역할**
+Loading 씬에서 선택된 슬롯의 Quest 전용 저장 파일을 로드합니다.
+
+**주요 책임**
+
+* Quest 전용 파일 경로 계산
+* Quest 전용 암호화 AAD 사용
+* Core 백업 파일과 충돌하지 않는 Quest 전용 복구 경로 사용
+* 로드/복구 결과를 `SaveDataContainerQuest`로 역직렬화
+
+---
+
+### `SaveDataConstantsQuest`
+
+**위치**
+`SaveData/SaveDataConstantsQuest.cs`
+
+**역할**
+Quest 저장 파일명, 백업 파일명과 논리 저장 Scope를 정의합니다.
+
+**주요 값**
+
+* 파일명: `SaveDataQuest.json`
+* 복구용 백업 경로명: `SaveDataQuest.backup.json`
+* 저장 Scope: `quest`
 
 ---
 
@@ -251,13 +422,14 @@ Quest 진행 상태를 저장하고 복원합니다.
 
 * `ISaveContributor` 구현
 * `SaveRegistry` 등록/해제
-* Core 저장 확장 섹션 `quest.progress`에 진행 상태 기록
-* 기존 QuestData JSON 구조와 호환되는 형태로 복원
+* Quest 전용 저장 컨테이너의 진행 상태 복원
+* 기존 Core 저장 확장 섹션 `quest.progress`의 하위 호환 복원
+* Quest 상태 변경 시 `SaveDataManagerQuest.StartSaveData()` 요청
 * Quest 상태와 목표 진행 수량 저장
 * HUD 진행 수량 갱신
 
 **왜 중요한가**
-Quest가 Core 저장 시스템 안에 독립 섹션으로 들어가도록 만드는 핵심 데이터 클래스입니다.
+실행 중 변하는 Quest 진행 상태의 단일 데이터 소스입니다. Quest 정의 JSON 전체는 저장하지 않고 UID, 단계, 수량, 상태만 저장합니다.
 
 ---
 
@@ -278,7 +450,26 @@ Quest가 Core 저장 시스템 안에 독립 섹션으로 들어가도록 만드
 
 ---
 
-## 3-4. 목표 처리기 계층
+### Quest 저장/복원 흐름
+
+```text
+[Load]
+SceneLoadingQuest
+  → SaveDataLoaderQuest
+  → SaveDataQuest.json 역직렬화
+  → SaveDataManagerQuest.InitializeData
+  → QuestData 생성 및 quest.progress 폴백 복원
+  → 전용 Quest 데이터가 있으면 우선 적용
+
+[Save]
+QuestData.SaveStatus / SaveCount
+  → SaveDataManagerQuest.StartSaveData
+  → SaveDataQuest.json 기록
+```
+
+---
+
+## 3-5. 목표 처리기 계층
 
 ### `IObjectiveHandler`
 
@@ -350,7 +541,7 @@ Quest 목표 처리기의 공통 계약입니다.
 
 ---
 
-## 3-5. Core 연동 계층
+## 3-6. Core 연동 계층
 
 ### `NpcQuestController`
 
@@ -395,7 +586,7 @@ Quest 진행 조건과 Map/Monster 리스폰 정책을 느슨하게 연결하는
 
 ---
 
-## 3-6. UI 계층
+## 3-7. UI 계층
 
 ### `UIWindowHudQuest`
 
@@ -467,7 +658,7 @@ Quest HUD와 보상 창 UID 같은 Quest 전용 UI 상수를 정의합니다.
 
 ---
 
-## 3-7. Addressables / Config / Localization
+## 3-8. Addressables / Config / Localization
 
 ### `ConfigAddressable*Quest`
 
@@ -518,6 +709,7 @@ Quest JSON을 생성/편집하는 메인 EditorWindow입니다.
 * NPC, 몬스터, 맵, 대화, 아이템, 라이선스, 컷신 테이블 참조 제공
 * 단계 목록과 보상 목록 ReorderableList 구성
 * Quest JSON 저장
+* 선택 슬롯의 Core `quest.progress`와 `SaveDataQuest.json` 진행 상태 동시 초기화
 
 **왜 중요한가**
 Quest 패키지 Editor의 중심 도구입니다. 기획 데이터 제작 흐름은 이 창을 기준으로 추적하는 것이 가장 빠릅니다.
@@ -710,8 +902,39 @@ Quest가 Core 클래스를 직접 수정하거나 Core가 Quest를 참조하도�
 
 1. Core에 인터페이스/이벤트/레지스트리 같은 포트를 둡니다.
 2. Quest에 구현체를 둡니다.
-3. `QuestPackageManager` 또는 부트스트랩 단계에서 Core 레지스트리에 등록합니다.
+3. 서비스/정책은 `QuestPackageManager`, 캐릭터 표시 연결은 `BootstrapQuestRuntime`에서 등록합니다.
 4. 씬 종료 시 반드시 등록을 해제합니다.
+
+---
+
+## 5-4. Quest JSON 로딩 정책을 변경할 때
+
+다음 위치를 함께 확인합니다.
+
+1. `TableQuest`의 맵/NPC/트리거 인덱스
+2. `IQuestDefinitionRepository`
+3. `QuestDefinitionRepository`
+4. `QuestDefinitionCache`
+5. `QuestJsonAddressableLoader`
+6. `QuestManager`의 초기 복원과 맵 프리로드 흐름
+7. Addressables load/release 대칭
+
+Quest JSON 전체 선로드를 다시 `QuestManager`에 추가하지 않습니다.
+
+---
+
+## 5-5. Quest 저장 구조를 변경할 때
+
+다음 위치를 함께 확인합니다.
+
+1. `SaveDataContainerQuest`
+2. `SaveDataManagerQuest`
+3. `SaveDataLoaderQuest`
+4. `SaveDataConstantsQuest`
+5. `QuestData`
+6. `SceneLoadingQuest`의 저장 로딩 단계
+7. `QuestEditorWindow`의 진행 상태 초기화 도구
+8. 기존 Core `quest.progress` 마이그레이션 또는 하위 호환 정책
 
 ---
 
@@ -722,14 +945,18 @@ Quest가 Core 클래스를 직접 수정하거나 Core가 Quest를 참조하도�
 1. `QuestConstants`
 2. `TableQuest`
 3. `Quest`, `QuestStep`, `QuestReward`
-4. `QuestData`, `QuestSaveData`
-5. `QuestManager`
-6. `ObjectiveHandlerBase`, `ObjectiveHandlerFactory`
-7. 개별 `ObjectiveHandler*`
-8. `QuestPackageManager`
-9. `BootstrapQuestRuntime`
-10. `NpcQuestController`, `QuestInteractionChoiceContributor`
-11. `UIWindowHudQuest`, `UIElementHudQuest`, `UIWindowQuestReward`
+4. `QuestJsonAddressableLoader`
+5. `QuestDefinitionCache`, `QuestDefinitionRepository`
+6. `SaveDataLoaderQuest`, `SaveDataManagerQuest`
+7. `QuestData`, `QuestSaveData`
+8. `QuestManager`
+9. `ObjectiveHandlerBase`, `ObjectiveHandlerFactory`
+10. 개별 `ObjectiveHandler*`
+11. `SceneLoadingQuest`
+12. `QuestPackageManager`
+13. `BootstrapQuestRuntime`
+14. `NpcQuestController`, `QuestInteractionChoiceContributor`
+15. `UIWindowHudQuest`, `UIElementHudQuest`, `UIWindowQuestReward`
 
 ## Editor 추천 순서
 
@@ -745,4 +972,4 @@ Quest가 Core 클래스를 직접 수정하거나 Core가 Quest를 참조하도�
 
 # 7. Quest 패키지 구조를 한 문장으로 요약하면
 
-Quest 패키지는 **`QuestManager`를 중심으로 Quest 테이블/JSON, 목표 처리기, 저장 데이터, NPC 상호작용, HUD/보상 UI, 제작용 EditorWindow를 연결하여 퀘스트 진행 전체를 독립 패키지로 실행하는 구조**입니다.
+Quest 패키지는 **`SceneLoadingQuest`가 테이블과 저장 파일을 준비하고, `QuestPackageManager`가 런타임 서비스를 조립하며, `QuestManager`가 Repository 기반 지연 로드 Quest 정의와 목표 처리기, 전용 저장 데이터, NPC 상호작용, HUD/보상 UI를 연결하는 독립 패키지 구조**입니다.
