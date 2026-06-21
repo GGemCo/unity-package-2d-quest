@@ -25,6 +25,7 @@ namespace GGemCo2DQuest
         public override string Key => ConfigAddressableTableQuest.Quest;
         private static readonly Dictionary<int, Dictionary<int, List<int>>> QuestUidsByNpc = new Dictionary<int, Dictionary<int, List<int>>>();
         private static readonly Dictionary<int, List<int>> QuestUidsByEnterMap = new Dictionary<int, List<int>>();
+        private static readonly Dictionary<int, List<int>> QuestUidsByMap = new Dictionary<int, List<int>>();
 
         /// <summary>
         /// 퀘스트 테이블 재적재 전에 시작 조건별 인덱스를 초기화합니다.
@@ -33,6 +34,7 @@ namespace GGemCo2DQuest
         {
             QuestUidsByNpc.Clear();
             QuestUidsByEnterMap.Clear();
+            QuestUidsByMap.Clear();
         }
 
         /// <summary>
@@ -43,6 +45,7 @@ namespace GGemCo2DQuest
         {
             if (data == null || data.Uid <= 0) return;
 
+            AddMapQuest(data.MapUid, data.Uid);
             switch (data.TriggerType)
             {
                 case QuestConstants.TriggerType.TalkToNpc:
@@ -106,6 +109,27 @@ namespace GGemCo2DQuest
         }
 
         /// <summary>
+        /// 현재 맵에서 시작 가능성이 있는 퀘스트를 맵 UID 기준 프리로드 인덱스에 등록합니다.
+        /// </summary>
+        /// <param name="mapUid">퀘스트 시작 후보가 배치된 맵 UID입니다.</param>
+        /// <param name="questUid">등록할 퀘스트 UID입니다.</param>
+        private static void AddMapQuest(int mapUid, int questUid)
+        {
+            if (mapUid <= 0 || questUid <= 0)
+            {
+                return;
+            }
+
+            if (!QuestUidsByMap.TryGetValue(mapUid, out List<int> questUids))
+            {
+                questUids = new List<int>();
+                QuestUidsByMap.Add(mapUid, questUids);
+            }
+
+            questUids.Add(questUid);
+        }
+
+        /// <summary>
         /// 퀘스트 테이블 행을 강타입 데이터로 변환합니다.
         /// TriggerType 컬럼이 없는 기존 테이블은 TalkToNpc로 보정합니다.
         /// </summary>
@@ -147,6 +171,19 @@ namespace GGemCo2DQuest
         public IReadOnlyList<int> GetQuestsByEnterMap(int mapUid)
         {
             return QuestUidsByEnterMap.TryGetValue(mapUid, out List<int> questUids)
+                ? questUids
+                : System.Array.Empty<int>();
+        }
+
+        /// <summary>
+        /// 지정한 맵에서 시작될 수 있는 모든 퀘스트 UID 목록을 반환합니다.
+        /// EnterMap과 NPC 대화 후보를 맵 진입 후 선택적으로 프리로드할 때 사용합니다.
+        /// </summary>
+        /// <param name="mapUid">조회할 맵 UID입니다.</param>
+        /// <returns>현재 맵의 Quest JSON 프리로드 후보 UID 목록입니다.</returns>
+        public IReadOnlyList<int> GetQuestsByMap(int mapUid)
+        {
+            return QuestUidsByMap.TryGetValue(mapUid, out List<int> questUids)
                 ? questUids
                 : System.Array.Empty<int>();
         }

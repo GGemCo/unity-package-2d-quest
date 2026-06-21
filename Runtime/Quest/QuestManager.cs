@@ -1,9 +1,6 @@
 using GGemCo2DCore;
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using UnityEngine;
 
 namespace GGemCo2DQuest
 {
@@ -20,10 +17,12 @@ namespace GGemCo2DQuest
         private QuestData _questData;
         private PlayerData _playerData;
         private InventoryData _inventoryData;
-        private bool _isQuestJsonLoaded;
+        private IQuestDefinitionRepository _definitionRepository;
+        private bool _isInitialDefinitionLoadCompleted;
         private bool _isRegisteredMapEntered;
         private int _pendingMapEnteredUid;
         private int _objectiveStartDepth;
+        private int _lifecycleVersion;
         private bool _isFlushingObjectiveCompletions;
 
         private readonly ObjectiveHandlerFactory _handlerFactory = new ObjectiveHandlerFactory();
@@ -34,8 +33,6 @@ namespace GGemCo2DQuest
         private readonly Dictionary<int, Dictionary<int, IObjectiveHandler>> _activeHandlers =
             new Dictionary<int, Dictionary<int, IObjectiveHandler>>();
 
-        private readonly Dictionary<int, Quest> _quests = new Dictionary<int, Quest>();
-
         /// <summary>
         /// 퀘스트 매니저를 현재 게임 씬과 저장 데이터에 연결합니다.
         /// </summary>
@@ -43,9 +40,11 @@ namespace GGemCo2DQuest
         /// <param name="questData">Quest 패키지 진행 저장 데이터입니다.</param>
         public void Initialize(SceneGame scene, QuestData questData)
         {
-            _quests.Clear();
             _activeHandlers.Clear();
-            _isQuestJsonLoaded = false;
+            _lifecycleVersion++;
+            _definitionRepository?.Dispose();
+            _definitionRepository = null;
+            _isInitialDefinitionLoadCompleted = false;
             _pendingMapEnteredUid = 0;
             _objectiveStartDepth = 0;
             _isFlushingObjectiveCompletions = false;
@@ -54,6 +53,7 @@ namespace GGemCo2DQuest
             _sceneGame = scene;
             _tableQuest = TableLoaderManagerQuest.Instance?.TableQuest;
             _questData = questData;
+            _definitionRepository = new QuestDefinitionRepository(_tableQuest);
         }
 
         /// <summary>
@@ -70,7 +70,7 @@ namespace GGemCo2DQuest
             _uiWindowInventory =
                 _sceneGame.uIWindowManager?.GetUIWindowByUid<UIWindowInventory>(UIWindowConstants.WindowUid.Inventory);
             RegisterMapEnteredEvent();
-            _ = LoadAllQuestJson();
+            _ = LoadInitialQuestDefinitions(_lifecycleVersion);
         }
 
         /// <summary>
@@ -84,57 +84,84 @@ namespace GGemCo2DQuest
         }
 
         /// <summary>
-        /// 저장되어있는 퀘스트 불러오기
+        /// 저장 데이터에서 진행 중인 퀘스트 정의만 우선 로드하고 목표 처리기를 복원합니다.
         /// </summary>
-        private void LoadQuestDatas()
+        /// <param name="lifecycleVersion">초기화를 시작한 QuestManager 수명주기 버전입니다.</param>
+        private async Task LoadInitialQuestDefinitions(int lifecycleVersion)
         {
-            var datas = _questData.GetQuestDatas();
-            if (datas == null) return;
-            foreach (var data in datas)
+            IQuestDefinitionRepository repository = _definitionRepository;
+            if (repository == null || _questData == null)
             {
-                QuestSaveData questSaveData = data.Value;
-                if (questSaveData == null) continue;
-                if (questSaveData.Status != QuestConstants.Status.InProgress) continue;
-                StartObjective(questSaveData.QuestUid, questSaveData.QuestStepIndex);
-            }
-        }
-
-        /// <summary>
-        /// 모든 json 파일 읽어두기
-        /// </summary>
-        private async Task LoadAllQuestJson()
-        {
-            var datas = _tableQuest.GetDatas();
-            foreach (var data in datas)
-            {
-                await LoadQuestJson(data.Key);
+                return;
             }
 
-            LoadQuestDatas();
-            _isQuestJsonLoaded = true;
+            try
+            {
+                var datas = _questData.GetQuestDatas();
+                if (datas != null)
+                {
+                    foreach (KeyValuePair<int, QuestSaveData> data in datas)
+                    {
+                        QuestSaveData questSaveData = data.Value;
+                        if (questSaveData == null ||
+                            questSaveData.Status != QuestConstants.Status.InProgress)
+                        {
+                            continue;
+                        }
+
+                        Quest quest = await repository.GetAsync(questSaveData.QuestUid);
+                        if (lifecycleVersion != _lifecycleVersion)
+                        {
+                            return;
+                        }
+
+                        if (quest == null)
+                        {
+                            GcLogger.LogError(
+                                $"진행 중인 Quest JSON을 복원하지 못했습니다. uid: {questSaveData.QuestUid}");
+                            continue;
+                        }
+
+                        repository.MarkActive(questSaveData.QuestUid);
+                        StartObjective(questSaveData.QuestUid, questSaveData.QuestStepIndex);
+                    }
+                }
+            }
+            catch (System.Exception exception)
+            {
+                GcLogger.LogException(exception);
+            }
+
+            if (lifecycleVersion != _lifecycleVersion)
+            {
+                return;
+            }
+
+            _isInitialDefinitionLoadCompleted = true;
             await TryStartPendingEnterMapQuests();
         }
 
         /// <summary>
         /// 맵 입장 이벤트를 받아 EnterMap 트리거 퀘스트를 시작합니다.
-        /// 퀘스트 JSON 적재가 끝나기 전이면 실제 맵 입장 이벤트로 들어온 맵만 보류합니다.
+        /// 진행 중인 퀘스트 정의 복원이 끝나기 전이면 실제 맵 입장 이벤트로 들어온 맵만 보류합니다.
         /// </summary>
         /// <param name="eventData">입장 완료된 맵 정보입니다.</param>
         private async void OnMapEntered(MapEnteredEventData eventData)
         {
             if (eventData.MapUid <= 0) return;
-            if (!_isQuestJsonLoaded)
+            if (!_isInitialDefinitionLoadCompleted)
             {
                 _pendingMapEnteredUid = eventData.MapUid;
                 return;
             }
 
             await TryStartQuestsByEnterMap(eventData.MapUid);
+            _ = PreloadQuestDefinitionsForMap(eventData.MapUid);
         }
 
         /// <summary>
-        /// 퀘스트 JSON 로드 전에 수신한 맵 입장 이벤트가 있으면 해당 맵의 EnterMap 퀘스트를 시작합니다.
-        /// LoadAllQuestJson 자체에서는 임의의 현재 맵을 사용하지 않고, OnMapLoadComplete에서 발행된 이벤트만 처리합니다.
+        /// 초기 Quest 정의 복원 전에 수신한 맵 입장 이벤트가 있으면 해당 맵의 EnterMap 퀘스트를 시작합니다.
+        /// 임의의 현재 맵을 추정하지 않고 OnMapLoadComplete에서 발행된 이벤트만 처리합니다.
         /// </summary>
         private async Task TryStartPendingEnterMapQuests()
         {
@@ -143,6 +170,7 @@ namespace GGemCo2DQuest
             int mapUid = _pendingMapEnteredUid;
             _pendingMapEnteredUid = 0;
             await TryStartQuestsByEnterMap(mapUid);
+            _ = PreloadQuestDefinitionsForMap(mapUid);
         }
 
         /// <summary>
@@ -160,6 +188,23 @@ namespace GGemCo2DQuest
                 if (!_questData.IsStatusNone(questUid)) continue;
                 await StartQuest(questUid, 0, false);
             }
+        }
+
+        /// <summary>
+        /// 현재 맵에서 시작될 가능성이 있는 Quest JSON을 낮은 우선순위로 미리 로드합니다.
+        /// 맵 입장 처리 자체는 프리로드 완료를 기다리지 않습니다.
+        /// </summary>
+        /// <param name="mapUid">프리로드 후보를 조회할 현재 맵 UID입니다.</param>
+        private async Task PreloadQuestDefinitionsForMap(int mapUid)
+        {
+            if (mapUid <= 0 || _tableQuest == null || _definitionRepository == null)
+            {
+                return;
+            }
+
+            _definitionRepository.ReleaseUnused(mapUid);
+            IReadOnlyList<int> questUids = _tableQuest.GetQuestsByMap(mapUid);
+            await _definitionRepository.PreloadAsync(questUids, mapUid);
         }
 
         /// <summary>
@@ -194,13 +239,25 @@ namespace GGemCo2DQuest
                 return false;
             }
 
-            Quest quest = await LoadQuestJson(questUid);
+            IQuestDefinitionRepository repository = _definitionRepository;
+            if (repository == null)
+            {
+                return false;
+            }
+
+            Quest quest = await repository.GetAsync(questUid);
+            if (repository != _definitionRepository)
+            {
+                return false;
+            }
+
             if (quest == null)
             {
                 GcLogger.LogError("퀘스트 json 파일을 불러오지 못 했습니다. uid: " + questUid);
                 return false;
             }
 
+            repository.MarkActive(questUid);
             // 첫 단계 시작
             int stepIndex = 0;
             StartObjective(quest.uid, stepIndex, npcUid);
@@ -216,47 +273,6 @@ namespace GGemCo2DQuest
             }
 
             return true;
-        }
-
-        /// <summary>
-        /// 퀘스트 json 불러오기
-        /// </summary>
-        /// <param name="questUid"></param>
-        /// <returns></returns>
-        private async Task<Quest> LoadQuestJson(int questUid)
-        {
-            if (questUid <= 0) return null;
-            // 기존에 불러온 정보가 있으면
-            Quest quest = _quests.GetValueOrDefault(questUid);
-            if (quest != null) return quest;
-
-            var info = _tableQuest.GetDataByUid(questUid);
-            if (info == null) return null;
-            string key = ConfigAddressableTableQuest.GetQuestKey(info.Uid);
-            try
-            {
-                TextAsset textFile = await AddressableLoaderController.LoadByKeyAsync<TextAsset>(key);
-
-                if (textFile != null)
-                {
-                    string content = textFile.text;
-                    if (!string.IsNullOrEmpty(content))
-                    {
-                        quest = JsonConvert.DeserializeObject<Quest>(content);
-                        if (quest != null)
-                        {
-                            _quests.TryAdd(questUid, quest);
-                            return quest;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                GcLogger.LogError($"퀘스트 json 파일을 불러오는중 오류가 발생했습니다. {key}: {ex.Message}");
-            }
-
-            return null;
         }
 
         /// <summary>
@@ -342,10 +358,9 @@ namespace GGemCo2DQuest
         /// <param name="questUid"></param>
         public void NextStep(int questUid)
         {
-            var quest = _quests.GetValueOrDefault(questUid);
-            if (quest == null)
+            if (_definitionRepository == null || !_definitionRepository.TryGet(questUid, out _))
             {
-                GcLogger.LogError("quest 테이블에 없는 퀘스트 입니다. quest uid:" + questUid);
+                GcLogger.LogError("캐시에 없는 진행 중 퀘스트입니다. quest uid:" + questUid);
                 return;
             }
 
@@ -404,6 +419,7 @@ namespace GGemCo2DQuest
             // UIWindowHudQuest 에 element 빼기
             _uiWindowHudQuest?.RemoveQuestElement(questUid);
             DisposeQuestHandlers(questUid);
+            _definitionRepository?.MarkInactive(questUid);
         }
 
         /// <summary>
@@ -413,8 +429,7 @@ namespace GGemCo2DQuest
         private void GiveReward(int questUid)
         {
             if (questUid <= 0) return;
-            Quest quest = _quests.GetValueOrDefault(questUid);
-            if (quest == null)
+            if (_definitionRepository == null || !_definitionRepository.TryGet(questUid, out Quest quest))
             {
                 GcLogger.LogError("quest json 정보가 없습니다. uid: " + questUid);
                 return;
@@ -631,6 +646,7 @@ namespace GGemCo2DQuest
         /// </summary>
         public void OnDestroy()
         {
+            _lifecycleVersion++;
             if (_isRegisteredMapEntered)
             {
                 GameEventManager.MapEnteredEvent -= OnMapEntered;
@@ -644,6 +660,8 @@ namespace GGemCo2DQuest
             _queuedObjectiveCompletionQuestUids.Clear();
 
             DisposeAllHandlers();
+            _definitionRepository?.Dispose();
+            _definitionRepository = null;
         }
 
         private void DisposeAllHandlers()
@@ -657,17 +675,37 @@ namespace GGemCo2DQuest
             _activeHandlers.Clear();
         }
 
+        /// <summary>
+        /// 캐시에 적재된 퀘스트 정의에서 지정한 목표 단계를 조회합니다.
+        /// </summary>
+        /// <param name="questUid">조회할 퀘스트 UID입니다.</param>
+        /// <param name="stepIndex">조회할 목표 단계 인덱스입니다.</param>
+        /// <returns>유효한 목표 단계입니다. 정의가 없거나 인덱스 범위를 벗어나면 null을 반환합니다.</returns>
         public QuestStep GetQuestStep(int questUid, int stepIndex)
         {
-            Quest quest = _quests.GetValueOrDefault(questUid);
-            if (quest == null) return null;
-            if (stepIndex < 0 || stepIndex >= quest.steps.Count) return null;
+            if (_definitionRepository == null ||
+                !_definitionRepository.TryGet(questUid, out Quest quest) ||
+                quest.steps == null ||
+                stepIndex < 0 ||
+                stepIndex >= quest.steps.Count)
+            {
+                return null;
+            }
+
             return quest.steps[stepIndex];
         }
 
+        /// <summary>
+        /// 캐시에 적재된 퀘스트 정의를 반환하고 최근 사용 순서를 갱신합니다.
+        /// </summary>
+        /// <param name="questUid">조회할 퀘스트 UID입니다.</param>
+        /// <returns>캐시된 퀘스트 정의입니다. 아직 로드되지 않았으면 null을 반환합니다.</returns>
         public Quest GetQuestInfo(int questUid)
         {
-            return _quests.GetValueOrDefault(questUid);
+            return _definitionRepository != null &&
+                   _definitionRepository.TryGet(questUid, out Quest quest)
+                ? quest
+                : null;
         }
     }
 }
