@@ -1,0 +1,26 @@
+{
+    "name": "GGemCo2DQuestEditor",
+    "rootNamespace": "GGemCo2DQuestEditor",
+    "references": [
+        "Unity.TextMeshPro",
+        "Unity.Addressables",
+        "Unity.Addressables.Editor",
+        "Unity.ResourceManager",
+        "Unity.Localization",
+        "Unity.Localization.Editor",
+        "GGemCoScripts",
+        "GGemCo2DCoreEditor",
+        "GGemCo2DQuest"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

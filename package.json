@@ -1,0 +1,30 @@
+{
+  "name": "com.ggemco.2d.quest",
+  "version": "0.1.0",
+  "displayName": "GGemCo 2D Quest",
+  "description": "GGemCo 2D Core 기반의 퀘스트 진행, 목표 처리, 보상, 저장, UI와 제작 도구를 제공합니다.",
+  "unity": "2022.3",
+  "author": {
+    "name": "GGemCo",
+    "url": "https://github.com/GGemCo/unity-package-2d-quest.git"
+  },
+  "dependencies": {
+  },
+  "samples": [
+    {
+      "displayName": "Quest Data",
+      "description": "퀘스트 테이블과 JSON 데이터 샘플입니다.",
+      "path": "Samples~/DataAddressable"
+    },
+    {
+      "displayName": "Quest UI",
+      "description": "퀘스트 HUD와 보상 창 프리팹 샘플입니다.",
+      "path": "Samples~/UIWindows"
+    }
+  ],
+  "keywords": [
+    "quest",
+    "objective",
+    "reward"
+  ]
+}
