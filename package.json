@@ -20,6 +20,11 @@
       "displayName": "Quest UI",
       "description": "퀘스트 HUD와 보상 창 프리팹 샘플입니다.",
       "path": "Samples~/UIWindows"
+    },
+    {
+      "displayName": "Quest Localization",
+      "description": "퀘스트 UI와 시스템 메시지 Localization 샘플입니다.",
+      "path": "Samples~/Localization"
     }
   ],
   "keywords": [

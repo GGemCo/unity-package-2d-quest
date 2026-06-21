@@ -26,7 +26,7 @@ namespace GGemCo2DQuest
         private UIWindowItemInfo _uiWindowItemInfo;
         protected override void Awake()
         {
-            uid = UIWindowConstants.WindowUid.QuestReward;
+            uid = QuestWindowConstants.QuestReward;
             base.Awake();
             buttonConfirm?.onClick.AddListener(OnClickConfirm);
         }

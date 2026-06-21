@@ -380,7 +380,6 @@ namespace GGemCo2DQuestEditor
                 _saveDataContainer = JsonConvert.DeserializeObject<SaveDataContainer>(json);
             }
 
-            _saveDataContainer.QuestData = null;
             _saveDataContainer.Extensions ??= new Dictionary<string, JToken>();
             _saveDataContainer.Extensions[QuestData.SaveSectionKey] = JObject.FromObject(new
             {

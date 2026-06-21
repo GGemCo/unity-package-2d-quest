@@ -30,7 +30,7 @@ MonoBehaviour:
         - rid: 9086697476029153524
         - rid: 9086697476029153525
         - rid: 9086697476029153526
-        m_ConnectedFile: com.ggemco.2d.core/Samples~/Localization/Csv/UIWindow/GGemCo_UIWindowQuestReward.csv
+        m_ConnectedFile: com.ggemco.2d.quest/Samples~/Localization/Csv/UIWindow/GGemCo_UIWindowQuestReward.csv
     - rid: 9086697476029153524
       type: {class: KeyIdColumns, ns: UnityEditor.Localization.Plugins.CSV.Columns, asm: Unity.Localization.Editor}
       data:

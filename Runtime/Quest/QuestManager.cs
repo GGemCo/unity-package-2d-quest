@@ -64,10 +64,9 @@ namespace GGemCo2DQuest
             _playerData = _sceneGame.saveDataManager.Player;
             _inventoryData = _sceneGame.saveDataManager.Inventory;
             _uiWindowHudQuest =
-                _sceneGame.uIWindowManager?.GetUIWindowByUid<UIWindowHudQuest>(UIWindowConstants.WindowUid.HudQuest);
+                _sceneGame.uIWindowManager?.GetUIWindowByUid<UIWindowHudQuest>(QuestWindowConstants.HudQuest);
             _uiWindowQuestReward =
-                _sceneGame.uIWindowManager?.GetUIWindowByUid<UIWindowQuestReward>(UIWindowConstants.WindowUid
-                    .QuestReward);
+                _sceneGame.uIWindowManager?.GetUIWindowByUid<UIWindowQuestReward>(QuestWindowConstants.QuestReward);
             _uiWindowInventory =
                 _sceneGame.uIWindowManager?.GetUIWindowByUid<UIWindowInventory>(UIWindowConstants.WindowUid.Inventory);
             RegisterMapEnteredEvent();
@@ -164,12 +163,12 @@ namespace GGemCo2DQuest
         }
 
         /// <summary>
-        /// 퀘스트 시작 처리
+        /// 지정한 퀘스트를 시작하고 첫 번째 목표를 활성화합니다.
         /// </summary>
-        /// <param name="questUid"></param>
+        /// <param name="questUid">시작할 퀘스트 UID입니다.</param>
         /// <param name="npcUid">퀘스트를 시작한 NPC UID입니다. 맵 입장 시작 퀘스트는 0을 사용합니다.</param>
         /// <param name="showAlreadyStartedWarning">이미 진행 중일 때 시스템 경고 메시지를 표시할지 여부입니다.</param>
-        /// <returns></returns>
+        /// <returns>퀘스트를 새로 시작했으면 <see langword="true"/>, 시작할 수 없으면 <see langword="false"/>입니다.</returns>
         public async Task<bool> StartQuest(int questUid, int npcUid, bool showAlreadyStartedWarning = true)
         {
             if (questUid <= 0) return false;
@@ -180,7 +179,16 @@ namespace GGemCo2DQuest
             {
                 if (showAlreadyStartedWarning)
                 {
-                    _sceneGame.systemMessageManager.ShowMessageWarning("Quest_InProgress"); //"진행중인 퀘스트 입니다."
+                    string message = LocalizationManager.Instance?.GetSmartString(
+                        QuestLocalizationConstants.SystemMessageTable,
+                        QuestLocalizationConstants.AlreadyInProgressKey);
+                    if (string.IsNullOrEmpty(message))
+                    {
+                        // Quest Localization 샘플을 아직 병합하지 않은 프로젝트에서도 의미가 전달되도록 기본 문구를 사용합니다.
+                        message = "이미 진행 중인 퀘스트입니다.";
+                    }
+
+                    _sceneGame.systemMessageManager.ShowMessageWarning(message);
                 }
 
                 return false;

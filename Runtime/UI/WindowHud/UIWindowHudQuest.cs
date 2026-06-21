@@ -20,8 +20,8 @@ namespace GGemCo2DQuest
         
         protected override void Awake()
         {
-            // uid 를 먼저 지정해야 한다.
-            uid = UIWindowConstants.WindowUid.HudQuest;
+            // Core 윈도우 초기화 전에 Quest 패키지가 소유한 UID를 지정합니다.
+            uid = QuestWindowConstants.HudQuest;
             base.Awake();
         }
         /// <summary>

@@ -148,7 +148,7 @@ namespace GGemCo2DQuest
             
             _uiWindowHudQuest ??=
                 SceneGame.Instance.uIWindowManager?.GetUIWindowByUid<UIWindowHudQuest>(
-                    UIWindowConstants.WindowUid.HudQuest);
+                    QuestWindowConstants.HudQuest);
             _uiWindowHudQuest?.SetCount(questUid, count);
             SaveDatas();
         }

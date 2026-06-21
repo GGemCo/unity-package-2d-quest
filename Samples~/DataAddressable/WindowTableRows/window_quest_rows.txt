@@ -1,0 +1,3 @@
+Uid	Name	UseInGame	DefaultActive	Ordering	IsInteraction	OpenWindowUid	CloseWindowUid	PrefabName
+20	Hud 퀘스트 목록	Y	Y	2	N	0	0	UIWindowHudQuest
+21	퀘스트 보상 목록	Y	N	15	N	0	0	UIWindowQuestReward

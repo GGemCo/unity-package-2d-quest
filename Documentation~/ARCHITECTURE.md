@@ -19,6 +19,6 @@ Quest Runtime은 Core의 캐릭터, 이벤트, 테이블 기반 클래스, 저�
 - `QuestInteractionChoiceContributor`: NPC 인터랙션 대화창에 Quest 선택지를 제공합니다.
 - `QuestMonsterRespawnSuppressionPolicy`: 맵 전체 처치 목표 중 몬스터 리스폰을 억제합니다.
 
-## 하위 호환성
+## 저장 경계
 
-Core 저장 파일의 최상위 `QuestData` 필드는 Core에서 `JToken`으로 읽은 후 `quest.progress` 확장 섹션으로 전달합니다. Quest 패키지가 등록되면 동일한 `QuestDatas` 구조로 복원하며, 다음 저장부터 확장 섹션에 기록합니다.
+Quest 진행 데이터는 Core 저장 컨테이너의 `Extensions` 아래 `quest.progress` 섹션으로만 저장하고 복원합니다. Core는 Quest 저장 구조나 Quest 전용 섹션 키를 알지 않으며, Quest 패키지가 `ISaveContributor`를 통해 수명주기를 관리합니다.
