@@ -34,6 +34,33 @@ namespace GGemCo2DQuest
             new Dictionary<int, Dictionary<int, IObjectiveHandler>>();
 
         /// <summary>
+        /// 비동기 초기 복원에 사용할 퀘스트 UID와 목표 단계 인덱스의 값 스냅샷입니다.
+        /// </summary>
+        private readonly struct InitialQuestRestoreTarget
+        {
+            /// <summary>
+            /// 초기 복원 대상 정보를 생성합니다.
+            /// </summary>
+            /// <param name="questUid">복원할 퀘스트 UID입니다.</param>
+            /// <param name="stepIndex">복원할 목표 단계 인덱스입니다.</param>
+            public InitialQuestRestoreTarget(int questUid, int stepIndex)
+            {
+                QuestUid = questUid;
+                StepIndex = stepIndex;
+            }
+
+            /// <summary>
+            /// 복원할 퀘스트 UID입니다.
+            /// </summary>
+            public int QuestUid { get; }
+
+            /// <summary>
+            /// 복원할 목표 단계 인덱스입니다.
+            /// </summary>
+            public int StepIndex { get; }
+        }
+
+        /// <summary>
         /// 퀘스트 매니저를 현재 게임 씬과 저장 데이터에 연결합니다.
         /// </summary>
         /// <param name="scene">현재 Core 게임 씬입니다.</param>
@@ -98,33 +125,25 @@ namespace GGemCo2DQuest
             try
             {
                 var datas = _questData.GetQuestDatas();
-                if (datas != null)
+                List<InitialQuestRestoreTarget> restoreTargets = CreateInitialQuestRestoreTargets(datas);
+                for (int i = 0; i < restoreTargets.Count; i++)
                 {
-                    foreach (KeyValuePair<int, QuestSaveData> data in datas)
+                    InitialQuestRestoreTarget restoreTarget = restoreTargets[i];
+                    Quest quest = await repository.GetAsync(restoreTarget.QuestUid);
+                    if (lifecycleVersion != _lifecycleVersion)
                     {
-                        QuestSaveData questSaveData = data.Value;
-                        if (questSaveData == null ||
-                            questSaveData.Status != QuestConstants.Status.InProgress)
-                        {
-                            continue;
-                        }
-
-                        Quest quest = await repository.GetAsync(questSaveData.QuestUid);
-                        if (lifecycleVersion != _lifecycleVersion)
-                        {
-                            return;
-                        }
-
-                        if (quest == null)
-                        {
-                            GcLogger.LogError(
-                                $"진행 중인 Quest JSON을 복원하지 못했습니다. uid: {questSaveData.QuestUid}");
-                            continue;
-                        }
-
-                        repository.MarkActive(questSaveData.QuestUid);
-                        StartObjective(questSaveData.QuestUid, questSaveData.QuestStepIndex);
+                        return;
                     }
+
+                    if (quest == null)
+                    {
+                        GcLogger.LogError(
+                            $"진행 중인 Quest JSON을 복원하지 못했습니다. uid: {restoreTarget.QuestUid}");
+                        continue;
+                    }
+
+                    repository.MarkActive(restoreTarget.QuestUid);
+                    StartObjective(restoreTarget.QuestUid, restoreTarget.StepIndex);
                 }
             }
             catch (System.Exception exception)
@@ -139,6 +158,37 @@ namespace GGemCo2DQuest
 
             _isInitialDefinitionLoadCompleted = true;
             await TryStartPendingEnterMapQuests();
+        }
+
+        /// <summary>
+        /// 현재 진행 중인 퀘스트의 초기 복원 대상을 값 목록으로 복사합니다.
+        /// </summary>
+        /// <param name="datas">퀘스트 UID별 저장 데이터입니다.</param>
+        /// <returns>비동기 로드 중 원본 컬렉션 변경의 영향을 받지 않는 복원 대상 목록입니다.</returns>
+        private static List<InitialQuestRestoreTarget> CreateInitialQuestRestoreTargets(
+            IReadOnlyDictionary<int, QuestSaveData> datas)
+        {
+            var restoreTargets = new List<InitialQuestRestoreTarget>();
+            if (datas == null || datas.Count <= 0)
+            {
+                return restoreTargets;
+            }
+
+            foreach (KeyValuePair<int, QuestSaveData> data in datas)
+            {
+                QuestSaveData questSaveData = data.Value;
+                if (questSaveData == null ||
+                    questSaveData.Status != QuestConstants.Status.InProgress)
+                {
+                    continue;
+                }
+
+                // await 이전에 필요한 값만 복사하여 로드 도중 저장 Dictionary가 변경되어도 열거자를 유지하지 않습니다.
+                restoreTargets.Add(
+                    new InitialQuestRestoreTarget(questSaveData.QuestUid, questSaveData.QuestStepIndex));
+            }
+
+            return restoreTargets;
         }
 
         /// <summary>
