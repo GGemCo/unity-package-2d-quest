@@ -13,6 +13,11 @@ namespace GGemCo2DQuest
     public static class ConfigAddressableTableQuest
     {
         /// <summary>
+        /// Quest 런타임 테이블 pack 식별자입니다.
+        /// </summary>
+        public const string PackageId = "quest";
+
+        /// <summary>
         /// Quest 기본 정의 테이블의 논리적 이름.
         /// </summary>
         public const string Quest = "quest";
@@ -22,6 +27,12 @@ namespace GGemCo2DQuest
         /// </summary>
         public static readonly AddressableAssetInfo TableQuest =
             ConfigAddressableTable.Make(Quest);
+
+        /// <summary>
+        /// Quest 패키지 런타임 테이블 pack Addressables 자산 정보입니다.
+        /// </summary>
+        public static readonly AddressableAssetInfo TablePackQuest =
+            ConfigAddressableTablePack.Make(PackageId);
 
         /// <summary>
         /// Quest 도메인에서 사용하는 모든 테이블 Addressables 자산 목록.

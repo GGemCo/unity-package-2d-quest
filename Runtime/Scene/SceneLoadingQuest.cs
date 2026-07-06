@@ -78,7 +78,7 @@ namespace GGemCo2DQuest
                 order: 246,
                 localizedKey: LocalizationConstants.Keys.Loading.TextTypeTables(),
                 tableLoader: tableLoader,
-                tablePack: ConfigAddressableTablePack.Quest,
+                tablePack: ConfigAddressableTableQuest.TablePackQuest,
                 fallbackTables: targetTables
             );
             sender.Register(stepTable);

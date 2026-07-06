@@ -18,12 +18,12 @@ namespace GGemCo2DQuestEditor
         /// <summary>
         /// Quest 런타임 pack 내부에 기록할 패키지 식별자입니다.
         /// </summary>
-        protected override string PackageId => ConfigAddressableTablePack.PackageQuest;
+        protected override string PackageId => ConfigAddressableTableQuest.PackageId;
 
         /// <summary>
         /// Quest 런타임 테이블 pack의 Addressables 정보입니다.
         /// </summary>
-        protected override AddressableAssetInfo PackInfo => ConfigAddressableTablePack.Quest;
+        protected override AddressableAssetInfo PackInfo => ConfigAddressableTableQuest.TablePackQuest;
 
         /// <summary>
         /// Quest 런타임 pack에 포함할 개별 테이블 목록입니다.

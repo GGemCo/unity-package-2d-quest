@@ -1,4 +1,4 @@
-﻿using GGemCo2DCore;
+using GGemCo2DCore;
 using GGemCo2DCoreEditor;
 using GGemCo2DQuest;
 using UnityEditor;
@@ -127,9 +127,9 @@ namespace GGemCo2DQuestEditor
         /// <param name="ctx">자동 설정 실행 컨텍스트입니다.</param>
         private void RegisterRuntimeTablePack(AddressableAssetSettings settings, AddressableAssetGroup group, EditorSetupContext ctx)
         {
-            AddressableAssetInfo pack = ConfigAddressableTablePack.Quest;
+            AddressableAssetInfo pack = ConfigAddressableTableQuest.TablePackQuest;
             bool built = RuntimeTablePackBuilder.Build(
-                ConfigAddressableTablePack.PackageQuest,
+                ConfigAddressableTableQuest.PackageId,
                 pack,
                 ConfigAddressableTableQuest.All,
                 ctx);
