@@ -1,4 +1,4 @@
-using GGemCo2DCore;
+using GGemCo2DCoreEditor;
 
 namespace GGemCo2DQuestEditor
 {
@@ -43,14 +43,14 @@ namespace GGemCo2DQuestEditor
         /// <summary>
         /// Quest 툴 메뉴의 최상위 경로 접두사입니다.
         /// </summary>
-        private const string NameToolGGemCoQuest = ConfigDefine.NameSDK+"ToolQuest/";
+        private const string NameToolGGemCoQuest = GGemCoToolMenu.Quest;
 
         // 기본 셋팅하기
 
         /// <summary>
         /// 기본 셋팅 메뉴(설정하기)의 경로 접두사입니다.
         /// </summary>
-        private const string NameToolSettings = NameToolGGemCoQuest + "설정하기/";
+        private const string NameToolSettings = NameToolGGemCoQuest + GGemCoToolMenu.Settings;
 
         /// <summary>
         /// "자동 셋팅하기" 메뉴 경로입니다.
@@ -70,7 +70,7 @@ namespace GGemCo2DQuestEditor
         /// <summary>
         /// 개발툴 메뉴의 경로 접두사입니다.
         /// </summary>
-        private const string NameToolDevelopment = NameToolGGemCoQuest + "개발툴/";
+        private const string NameToolDevelopment = NameToolGGemCoQuest + GGemCoToolMenu.Development;
 
         public const string NameToolQuest = NameToolDevelopment + "퀘스트 생성툴";
 
@@ -80,15 +80,15 @@ namespace GGemCo2DQuestEditor
         /// <remarks>
         /// NOTE: 현재 문자열이 "테스트툴"로 되어 있는데, 의도한 표기가 "테스트툴"이라면 수정이 필요합니다.
         /// </remarks>
-        private const string NameToolTest = NameToolGGemCoQuest + "테스트툴/";
+        private const string NameToolTest = NameToolGGemCoQuest + GGemCoToolMenu.Test;
         
         // 디버그
-        private const string NameToolDebug = NameToolGGemCoQuest + "디버그툴/";
+        private const string NameToolDebug = NameToolGGemCoQuest + GGemCoToolMenu.Debug;
 
         /// <summary>
         /// 기타 메뉴의 경로 접두사입니다.
         /// </summary>
-        private const string NameToolEtc = NameToolGGemCoQuest + "기타/";
+        private const string NameToolEtc = NameToolGGemCoQuest + GGemCoToolMenu.Etc;
 
         /// <summary>
         /// 패키지 내 Quest 에디터에서 참조하는 기본 경로(패키지 루트)입니다.
