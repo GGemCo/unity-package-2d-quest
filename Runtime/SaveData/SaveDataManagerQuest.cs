@@ -91,8 +91,9 @@ namespace GGemCo2DQuest
         /// <summary>
         /// 매니저가 제거될 때 Quest 저장 기여자 등록을 해제합니다.
         /// </summary>
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             Quest?.Unregister();
             Quest = null;
         }
