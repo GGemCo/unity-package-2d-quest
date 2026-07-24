@@ -28,6 +28,7 @@ namespace GGemCo2DQuest
         private readonly ObjectiveHandlerFactory _handlerFactory = new ObjectiveHandlerFactory();
         private readonly Queue<int> _pendingObjectiveCompletionQuestUids = new Queue<int>();
         private readonly HashSet<int> _queuedObjectiveCompletionQuestUids = new HashSet<int>();
+        private readonly HashSet<int> _finishingQuestUids = new HashSet<int>();
 
         // QuestUid → StepIndex → Handler
         private readonly Dictionary<int, Dictionary<int, IObjectiveHandler>> _activeHandlers =
@@ -77,6 +78,7 @@ namespace GGemCo2DQuest
             _isFlushingObjectiveCompletions = false;
             _pendingObjectiveCompletionQuestUids.Clear();
             _queuedObjectiveCompletionQuestUids.Clear();
+            _finishingQuestUids.Clear();
             _sceneGame = scene;
             _tableQuest = TableLoaderManagerQuest.Instance?.TableQuest;
             _questData = questData;
@@ -363,6 +365,44 @@ namespace GGemCo2DQuest
             }
 
             NextStep(questUid);
+        }
+
+        /// <summary>
+        /// 현재 진행 중인 퀘스트를 마지막 단계까지 정상 완료하고 보상을 지급합니다.
+        /// 기존 종료 흐름을 재사용하므로 HUD, 목표 처리기, 정의 캐시 활성 상태와 저장 데이터가 함께 정리됩니다.
+        /// </summary>
+        /// <param name="questUid">완료할 퀘스트 UID입니다.</param>
+        /// <returns>퀘스트가 진행 중이었고 이번 호출에서 종료되었으면 <see langword="true"/>를 반환합니다.</returns>
+        public bool TryFinishQuest(int questUid)
+        {
+            if (questUid <= 0 || _questData == null || _definitionRepository == null)
+            {
+                return false;
+            }
+
+            QuestSaveData questSaveData = _questData.GetQuestData(questUid);
+            if (questSaveData == null ||
+                questSaveData.Status != QuestConstants.Status.InProgress ||
+                !_definitionRepository.TryGet(questUid, out _))
+            {
+                return false;
+            }
+
+            if (!_finishingQuestUids.Add(questUid))
+            {
+                return false;
+            }
+
+            try
+            {
+                // EndQuest가 보상 지급, 저장, HUD 제거와 활성 Handler 해제를 한 경로에서 처리합니다.
+                EndQuest(questUid);
+                return _questData.IsStatusEnd(questUid);
+            }
+            finally
+            {
+                _finishingQuestUids.Remove(questUid);
+            }
         }
 
         /// <summary>
@@ -708,6 +748,7 @@ namespace GGemCo2DQuest
             _isFlushingObjectiveCompletions = false;
             _pendingObjectiveCompletionQuestUids.Clear();
             _queuedObjectiveCompletionQuestUids.Clear();
+            _finishingQuestUids.Clear();
 
             DisposeAllHandlers();
             _definitionRepository?.Dispose();
