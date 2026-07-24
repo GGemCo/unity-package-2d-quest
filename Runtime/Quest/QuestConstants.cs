@@ -55,6 +55,7 @@ namespace GGemCo2DQuest
             ReachPosition = 5,
             PlayCutscene = 6,
             KillMonsterInMap = 7,
+            PlayDialogue = 8,
         }
         /// <summary>
         /// 레거시 Resources 기반 Quest JSON 폴더의 절대 경로를 반환합니다.

@@ -27,7 +27,7 @@ Core는 Quest를 직접 참조하지 않고, Quest가 Core의 공통 포트와 �
 * Quest 테이블 전체 선로드와 Quest JSON 지연 로딩
 * 진행 중 Quest 우선 복원, 현재 맵 후보 프리로드, LRU 정의 캐시
 * 퀘스트 시작 조건 처리(`TalkToNpc`, `EnterMap`)
-* 목표 단계 처리(`TalkToNpc`, `KillMonster`, `KillMonsterInMap`, `CollectItem`, `EnterMap`, `ReachPosition`, `PlayCutscene`)
+* 목표 단계 처리(`TalkToNpc`, `PlayDialogue`, `KillMonster`, `KillMonsterInMap`, `CollectItem`, `EnterMap`, `ReachPosition`, `PlayCutscene`)
 * Quest 전용 저장 파일(`SaveDataQuest.json`) 저장/복원
 * 기존 Core `quest.progress` 확장 섹션 하위 호환 복원
 * NPC 퀘스트 아이콘과 상호작용 선택지 제공
@@ -228,6 +228,13 @@ Quest JSON 한 건의 단계와 보상 정의를 보관합니다.
 **주의점**
 저장 데이터와 기존 JSON 호환을 위해 enum 정수값은 신중하게 변경해야 합니다.
 
+**대화 목표 구분**
+
+* `TalkToNpc = 1`: 대상 NPC와 상호작용했을 때 대화를 시작합니다.
+* `PlayDialogue = 8`: 목표 단계가 활성화되는 즉시 대화를 시작합니다.
+
+`PlayDialogue`는 기존 enum 정수값을 변경하지 않고 마지막 값 뒤에 추가되어 기존 Quest JSON과 저장 데이터의 단계 인덱스 구조를 유지합니다.
+
 ---
 
 ### `QuestReward`
@@ -342,6 +349,7 @@ TextAsset 로드
 * 맵 입장 이벤트 기반 Quest 시작
 * 현재 맵 Quest JSON 후보의 비동기 프리로드
 * NPC 대화 기반 Quest 시작
+* 선택된 `TalkToNpc` 처리기로 대화 시작 요청 직접 전달
 * 목표 처리기 시작/해제
 * 목표 완료 요청 큐 처리
 * 다음 단계 진행 또는 퀘스트 완료 처리
@@ -529,6 +537,7 @@ Quest 목표 처리기의 공통 계약입니다.
 **지원 목표**
 
 * `ObjectiveHandlerTalkToNpc`
+* `ObjectiveHandlerPlayDialogue`
 * `ObjectiveHandlerKillMonster`
 * `ObjectiveHandlerKillMonsterInMap`
 * `ObjectiveHandlerCollectItem`
@@ -537,7 +546,7 @@ Quest 목표 처리기의 공통 계약입니다.
 * `ObjectiveHandlerPlayCutscene`
 
 **왜 중요한가**
-각 목표 타입은 서로 다른 Core 이벤트나 상태를 구독합니다. 특정 목표만 완료되지 않는 문제는 해당 처리기에서 이벤트 구독/해제, 카운트 갱신, 완료 요청 조건을 먼저 확인해야 합니다.
+각 목표 타입은 서로 다른 Core 이벤트나 상태를 구독합니다. `TalkToNpc`는 NPC 상호작용 시작을 기다리고, `PlayDialogue`는 활성화 즉시 `UIWindowDialogue.LoadDialogue`를 호출합니다. 두 목표 모두 대상 NPC가 일치하는 대화 종료 이벤트에서 완료됩니다. 특정 목표만 완료되지 않는 문제는 해당 처리기에서 이벤트 구독/해제, 카운트 갱신, 완료 요청 조건을 먼저 확인해야 합니다.
 
 ---
 
@@ -570,6 +579,8 @@ NPC 대화창에 Quest 시작/진행 선택지를 제공합니다.
 
 **왜 중요한가**
 Core의 상호작용 시스템과 Quest 패키지를 결합하는 어댑터입니다. Core는 선택지 제공자 인터페이스만 알고, Quest가 선택지 구현을 등록합니다.
+
+진행 중인 `TalkToNpc` 선택지는 전역 `DialogStartEvent`를 명령으로 발행하지 않고, Quest UID와 단계 인덱스를 포함해 `QuestManager.TryStartTalkToNpcDialogue`에 직접 전달합니다. 실제 대화 시작 알림과 실행 요청을 분리하여 중복 대화 로드를 방지합니다.
 
 ---
 
@@ -617,7 +628,7 @@ Quest 진행 조건과 Map/Monster 리스폰 정책을 느슨하게 연결하는
 * Quest 제목 표시
 * 목표 타입별 안내 문구 표시
 * 목표 진행 수량 표시
-* EnterMap / PlayCutscene 같은 특수 목표 문구 구성
+* EnterMap / PlayCutscene / PlayDialogue 같은 특수 목표 문구 구성
 
 ---
 
@@ -747,6 +758,7 @@ Quest 단계 목록을 ReorderableList로 표시하고 목표 타입별 Drawer�
 **지원 Drawer**
 
 * `StepDrawerTalkToNpc`
+* `StepDrawerPlayDialogue`
 * `StepDrawerKillMonster`
 * `StepDrawerKillMonsterInMap`
 * `StepDrawerCollectItem`

@@ -95,7 +95,10 @@ namespace GGemCo2DQuest
 
             if (questInfo.Status == QuestConstants.Status.InProgress)
             {
-                GameEventManager.DialogStart(new DialogEventData(npcUid));
+                questManager.TryStartTalkToNpcDialogue(
+                    questInfo.QuestUid,
+                    questInfo.QuestStepIndex,
+                    npcUid);
             }
         }
     }

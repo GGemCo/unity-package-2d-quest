@@ -230,6 +230,13 @@ namespace GGemCo2DQuest
                         $"Quest JSON 목표 맵 UID가 없습니다. uid: {expectedQuestUid}, stepIndex: {i}, objective: {step.objectiveType}");
                     return false;
                 }
+
+                if (RequiresDialogueUid(step.objectiveType) && step.dialogueUid <= 0)
+                {
+                    GcLogger.LogError(
+                        $"Quest JSON 목표 대화 UID가 없습니다. uid: {expectedQuestUid}, stepIndex: {i}, objective: {step.objectiveType}");
+                    return false;
+                }
             }
 
             if (quest.reward?.items == null)
@@ -257,6 +264,7 @@ namespace GGemCo2DQuest
         private static bool RequiresTargetUid(QuestConstants.ObjectiveType objectiveType)
         {
             return objectiveType == QuestConstants.ObjectiveType.TalkToNpc ||
+                   objectiveType == QuestConstants.ObjectiveType.PlayDialogue ||
                    objectiveType == QuestConstants.ObjectiveType.KillMonster ||
                    objectiveType == QuestConstants.ObjectiveType.CollectItem;
         }
@@ -269,6 +277,17 @@ namespace GGemCo2DQuest
             return objectiveType == QuestConstants.ObjectiveType.EnterMap ||
                    objectiveType == QuestConstants.ObjectiveType.KillMonsterInMap ||
                    objectiveType == QuestConstants.ObjectiveType.ReachPosition;
+        }
+
+        /// <summary>
+        /// 목표 처리에 대화 UID가 필수인지 확인합니다.
+        /// </summary>
+        /// <param name="objectiveType">확인할 퀘스트 목표 타입입니다.</param>
+        /// <returns>대화 UID가 반드시 필요한 목표 타입이면 <see langword="true"/>를 반환합니다.</returns>
+        private static bool RequiresDialogueUid(QuestConstants.ObjectiveType objectiveType)
+        {
+            return objectiveType == QuestConstants.ObjectiveType.TalkToNpc ||
+                   objectiveType == QuestConstants.ObjectiveType.PlayDialogue;
         }
     }
 }

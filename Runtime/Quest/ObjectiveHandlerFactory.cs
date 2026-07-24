@@ -31,6 +31,8 @@ namespace GGemCo2DQuest
                     return new ObjectiveHandlerEnterMap(completionSink);
                 case QuestConstants.ObjectiveType.PlayCutscene:
                     return new ObjectiveHandlerPlayCutscene(completionSink);
+                case QuestConstants.ObjectiveType.PlayDialogue:
+                    return new ObjectiveHandlerPlayDialogue(completionSink);
                 default:
                     Debug.LogWarning($"Unsupported ObjectiveType: {type}");
                     return null;

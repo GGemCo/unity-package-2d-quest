@@ -96,6 +96,9 @@ namespace GGemCo2DQuest
                 case QuestConstants.ObjectiveType.PlayCutscene:
                     SetPlayCutsceneObjective(questStep);
                     break;
+                case QuestConstants.ObjectiveType.PlayDialogue:
+                    SetPlayDialogueObjective(questStep);
+                    break;
                 default:
                     break;
             }
@@ -141,6 +144,23 @@ namespace GGemCo2DQuest
                 ? cutsceneInfo.FileName
                 : cutsceneInfo.Memo;
             textQuestObjective.text = $"Play cutscene: {displayName}";
+        }
+
+        /// <summary>
+        /// PlayDialogue 목표의 자동 대화 안내 문구를 설정합니다.
+        /// </summary>
+        /// <param name="questStep">현재 표시할 퀘스트 단계 정보입니다.</param>
+        private void SetPlayDialogueObjective(QuestStep questStep)
+        {
+            if (questStep == null)
+            {
+                return;
+            }
+
+            StruckTableNpc npcInfo = _tableNpc?.GetDataByUid(questStep.targetUid);
+            textQuestObjective.text = npcInfo != null
+                ? $"Talk to {npcInfo.Name}"
+                : "Play dialogue";
         }
 
         /// <summary>

@@ -318,13 +318,35 @@ namespace GGemCo2DQuest
             if (questStep != null && questStep.objectiveType == QuestConstants.ObjectiveType.TalkToNpc)
             {
                 int dialogNpcUid = npcUid > 0 ? npcUid : questStep.targetUid;
-                var data = new DialogEventData(
-                    npcUid: dialogNpcUid
-                );
-                GameEventManager.DialogStart(data);
+                TryStartTalkToNpcDialogue(quest.uid, stepIndex, dialogNpcUid);
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// 현재 활성화된 TalkToNpc 목표 처리기에 NPC 대화 시작을 요청합니다.
+        /// 전역 대화 시작 알림을 명령으로 재사용하지 않고 선택된 퀘스트 단계에만 요청을 전달합니다.
+        /// </summary>
+        /// <param name="questUid">대화를 시작할 퀘스트 UID입니다.</param>
+        /// <param name="stepIndex">대화를 시작할 목표 단계 인덱스입니다.</param>
+        /// <param name="npcUid">상호작용한 NPC UID입니다.</param>
+        /// <returns>대상 목표 처리기가 요청을 수락했으면 <see langword="true"/>를 반환합니다.</returns>
+        public bool TryStartTalkToNpcDialogue(int questUid, int stepIndex, int npcUid)
+        {
+            if (questUid <= 0 || stepIndex < 0 || npcUid <= 0)
+            {
+                return false;
+            }
+
+            if (!_activeHandlers.TryGetValue(questUid, out Dictionary<int, IObjectiveHandler> stepHandlers) ||
+                !stepHandlers.TryGetValue(stepIndex, out IObjectiveHandler handler) ||
+                handler is not ObjectiveHandlerTalkToNpc talkToNpcHandler)
+            {
+                return false;
+            }
+
+            return talkToNpcHandler.TryStartDialogue(npcUid);
         }
 
         /// <summary>
