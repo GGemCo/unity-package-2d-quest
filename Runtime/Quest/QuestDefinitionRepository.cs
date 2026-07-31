@@ -239,18 +239,57 @@ namespace GGemCo2DQuest
                 }
             }
 
-            if (quest.reward?.items == null)
+            if (!ValidateItemRewards(expectedQuestUid, quest.reward?.items))
             {
-                return true;
+                return false;
             }
 
-            for (int i = 0; i < quest.reward.items.Count; i++)
+            return ValidateShopStockRewards(expectedQuestUid, quest.reward?.shopStocks);
+        }
+
+        /// <summary>
+        /// 아이템 보상 UID와 지급 수량을 검증합니다.
+        /// </summary>
+        /// <param name="questUid">검증 중인 퀘스트 UID입니다.</param>
+        /// <param name="items">검증할 아이템 보상 목록입니다.</param>
+        /// <returns>모든 아이템 보상이 유효하면 <see langword="true"/>를 반환합니다.</returns>
+        private static bool ValidateItemRewards(int questUid, List<RewardItem> items)
+        {
+            if (items == null) return true;
+
+            for (int i = 0; i < items.Count; i++)
             {
-                RewardItem item = quest.reward.items[i];
+                RewardItem item = items[i];
                 if (item != null && item.itemUid > 0 && item.amount <= 0)
                 {
                     GcLogger.LogError(
-                        $"Quest JSON 아이템 보상 수량이 유효하지 않습니다. uid: {expectedQuestUid}, rewardIndex: {i}");
+                        $"Quest JSON 아이템 보상 수량이 유효하지 않습니다. uid: {questUid}, rewardIndex: {i}");
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 상점 재고 보상의 shop_item UID와 충전 수량을 검증합니다.
+        /// </summary>
+        /// <param name="questUid">검증 중인 퀘스트 UID입니다.</param>
+        /// <param name="shopStocks">검증할 상점 재고 보상 목록입니다.</param>
+        /// <returns>모든 상점 재고 보상이 유효하면 <see langword="true"/>를 반환합니다.</returns>
+        private static bool ValidateShopStockRewards(
+            int questUid,
+            List<QuestRewardShopStock> shopStocks)
+        {
+            if (shopStocks == null) return true;
+
+            for (int i = 0; i < shopStocks.Count; i++)
+            {
+                QuestRewardShopStock shopStock = shopStocks[i];
+                if (shopStock == null || shopStock.shopItemUid <= 0 || shopStock.amount <= 0)
+                {
+                    GcLogger.LogError(
+                        $"Quest JSON 상점 재고 보상이 유효하지 않습니다. uid: {questUid}, rewardIndex: {i}");
                     return false;
                 }
             }

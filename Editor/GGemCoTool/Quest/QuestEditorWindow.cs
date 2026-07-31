@@ -23,6 +23,7 @@ namespace GGemCo2DQuestEditor
         public List<string> NameMap;
         public List<string> NameDialogue;
         public List<string> NameItem;
+        public List<string> NameShopItem;
         public List<string> NameLicense;
         public List<string> NameCutscene;
         public Dictionary<int, StruckTableQuest> StruckTableQuests;
@@ -31,15 +32,17 @@ namespace GGemCo2DQuestEditor
         public Dictionary<int, StruckTableMap> StruckTableMaps;
         public Dictionary<int, StruckTableDialogue> StruckTableDialogues;
         public Dictionary<int, StruckTableItem> StruckTableItems;
+        public Dictionary<int, StruckTableShopItem> StruckTableShopItems;
         public Dictionary<int, StruckTableLicense> StruckTableLicenses;
         public Dictionary<int, StruckTableCutscene> StruckTableCutscenes;
 
         public MetadataQuestStepListDrawer(List<string> nameQuest, List<string> nameNpc, List<string> nameMonster,
-            List<string> nameMap, List<string> nameDialogue, List<string> nameItem, List<string> nameLicense,
-            List<string> nameCutscene,
+            List<string> nameMap, List<string> nameDialogue, List<string> nameItem, List<string> nameShopItem,
+            List<string> nameLicense, List<string> nameCutscene,
             Dictionary<int, StruckTableQuest> struckTableQuests, Dictionary<int, StruckTableNpc> struckTableNpcs,
             Dictionary<int, StruckTableMonster> struckTableMonsters, Dictionary<int, StruckTableMap> struckTableMaps,
             Dictionary<int, StruckTableDialogue> struckTableDialogues, Dictionary<int, StruckTableItem> struckTableItems,
+            Dictionary<int, StruckTableShopItem> struckTableShopItems,
             Dictionary<int, StruckTableLicense> struckTableLicenses,
             Dictionary<int, StruckTableCutscene> struckTableCutscenes)
         {
@@ -49,6 +52,7 @@ namespace GGemCo2DQuestEditor
             NameMap = nameMap;
             NameDialogue = nameDialogue;
             NameItem = nameItem;
+            NameShopItem = nameShopItem;
             NameLicense = nameLicense;
             NameCutscene = nameCutscene;
             StruckTableQuests = struckTableQuests;
@@ -57,6 +61,7 @@ namespace GGemCo2DQuestEditor
             StruckTableMaps = struckTableMaps;
             StruckTableDialogues = struckTableDialogues;
             StruckTableItems = struckTableItems;
+            StruckTableShopItems = struckTableShopItems;
             StruckTableLicenses = struckTableLicenses;
             StruckTableCutscenes = struckTableCutscenes;
         }
@@ -75,6 +80,7 @@ namespace GGemCo2DQuestEditor
         private TableMap _tableMap;
         private TableDialogue _tableDialogue;
         private TableItem _tableItem;
+        private TableShopItem _tableShopItem;
         private TableLicense _tableLicense;
         private TableCutscene _tableCutscene;
         
@@ -87,6 +93,7 @@ namespace GGemCo2DQuestEditor
         private List<string> _nameMap = new List<string>();
         private List<string> _nameDialogue = new List<string>();
         private List<string> _nameItem = new List<string>();
+        private List<string> _nameShopItem = new List<string>();
         private List<string> _nameLicense = new List<string>();
         private List<string> _nameCutscene = new List<string>();
         private Dictionary<int, StruckTableQuest> _struckTableQuests = new Dictionary<int, StruckTableQuest>(); 
@@ -95,6 +102,8 @@ namespace GGemCo2DQuestEditor
         private Dictionary<int, StruckTableMap> _struckTableMaps = new Dictionary<int, StruckTableMap>(); 
         private Dictionary<int, StruckTableDialogue> _struckTableDialogues = new Dictionary<int, StruckTableDialogue>(); 
         private Dictionary<int, StruckTableItem> _struckTableItems = new Dictionary<int, StruckTableItem>(); 
+        private Dictionary<int, StruckTableShopItem> _struckTableShopItems =
+            new Dictionary<int, StruckTableShopItem>();
         private Dictionary<int, StruckTableLicense> _struckTableLicenses = new Dictionary<int, StruckTableLicense>();
         private Dictionary<int, StruckTableCutscene> _struckTableCutscenes = new Dictionary<int, StruckTableCutscene>();
 
@@ -158,6 +167,13 @@ namespace GGemCo2DQuestEditor
                 out _struckTableItems,
                 info => $"{info.Uid} - {info.Name}"
             );
+            TableLoaderManager.LoadTableData<TableShopItem, StruckTableShopItem>(
+                ConfigAddressableTable.ShopItem,
+                out _tableShopItem,
+                out _nameShopItem,
+                out _struckTableShopItems,
+                info => $"{info.Uid} - {info.Memo} (상점 {info.ShopUid}, 아이템 {info.ItemUid})"
+            );
             TableLoaderManager.LoadTableData<TableLicense, StruckTableLicense>(
                 ConfigAddressableTable.License,
                 out _tableLicense,
@@ -176,6 +192,7 @@ namespace GGemCo2DQuestEditor
             _quest.steps ??= new List<QuestStep>();
             _quest.reward ??= new QuestReward();
             _quest.reward.items ??= new List<RewardItem>();
+            _quest.reward.shopStocks ??= new List<QuestRewardShopStock>();
             _quest.reward.mapProgress ??= new QuestRewardMapProgress();
             _quest.reward.mapProgress.clearMapUids ??= new List<int>();
             _quest.reward.mapProgress.visibleWorldMapNodeIds ??= new List<string>();
@@ -183,13 +200,15 @@ namespace GGemCo2DQuestEditor
             _quest.reward.licenses ??= new List<QuestRewardLicense>();
 
             MetadataQuestStepListDrawer metadataQuestStepListDrawer = new MetadataQuestStepListDrawer(
-                _nameQuest, _nameNpc, _nameMonster, _nameMap, _nameDialogue, _nameItem, _nameLicense, _nameCutscene,
+                _nameQuest, _nameNpc, _nameMonster, _nameMap, _nameDialogue, _nameItem, _nameShopItem, _nameLicense,
+                _nameCutscene,
                 _struckTableQuests, 
                 _struckTableNpcs,
                 _struckTableMonsters,
                 _struckTableMaps, 
                 _struckTableDialogues, 
                 _struckTableItems,
+                _struckTableShopItems,
                 _struckTableLicenses,
                 _struckTableCutscenes
                 );

@@ -557,6 +557,7 @@ namespace GGemCo2DQuest
             _playerData?.AddCurrency(CurrencyConstants.Type.Gold, quest.reward.gold);
             _playerData?.AddCurrency(CurrencyConstants.Type.Silver, quest.reward.silver);
             GiveItemReward(quest.reward.items);
+            GiveShopStockReward(questUid, quest.reward.shopStocks);
             GiveMapProgressReward(quest.reward.mapProgress);
             GiveLicenseReward(quest.reward.licenses);
         }
@@ -574,6 +575,39 @@ namespace GGemCo2DQuest
                 if (rewardItem == null) continue;
                 ResultCommon result = _inventoryData?.AddItem(rewardItem.itemUid, rewardItem.amount);
                 _uiWindowInventory?.SetIcons(result);
+            }
+        }
+
+        /// <summary>
+        /// 퀘스트 보상으로 지정된 shop_item의 구매 가능 재고를 누적하여 충전합니다.
+        /// </summary>
+        /// <param name="questUid">재고 보상을 지급하는 퀘스트 UID입니다.</param>
+        /// <param name="shopStocks">충전할 shop_item 재고 보상 목록입니다.</param>
+        private void GiveShopStockReward(int questUid, List<QuestRewardShopStock> shopStocks)
+        {
+            if (shopStocks == null || shopStocks.Count <= 0) return;
+
+            ShopPurchaseData shopPurchaseData = _sceneGame?.saveDataManager?.ShopPurchase;
+            if (shopPurchaseData == null)
+            {
+                GcLogger.LogError($"상점 재고 보상을 지급할 저장 데이터가 없습니다. questUid: {questUid}");
+                return;
+            }
+
+            for (int i = 0; i < shopStocks.Count; i++)
+            {
+                QuestRewardShopStock shopStock = shopStocks[i];
+                if (shopStock == null || shopStock.shopItemUid <= 0 || shopStock.amount <= 0)
+                {
+                    continue;
+                }
+
+                if (!shopPurchaseData.GrantStock(shopStock.shopItemUid, shopStock.amount))
+                {
+                    GcLogger.LogError(
+                        $"퀘스트 상점 재고 보상 지급에 실패했습니다. questUid: {questUid}, " +
+                        $"shopItemUid: {shopStock.shopItemUid}, amount: {shopStock.amount}");
+                }
             }
         }
 

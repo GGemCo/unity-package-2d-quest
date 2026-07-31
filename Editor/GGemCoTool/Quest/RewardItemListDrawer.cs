@@ -13,10 +13,12 @@ namespace GGemCo2DQuestEditor
         private readonly QuestReward _reward;
         private readonly MetadataQuestStepListDrawer _metadataQuestStepListDrawer;
         private readonly ReorderableList _list;
+        private readonly ReorderableList _shopStockList;
         private readonly ReorderableList _clearMapList;
         private readonly ReorderableList _visibleMapNodeIdList;
         private readonly ReorderableList _mapNodeIdList;
         private readonly ReorderableList _licenseList;
+        private readonly string[] _shopItemNames;
         private int _selectedIndexItem = 0;
         
         /// <summary>
@@ -29,11 +31,13 @@ namespace GGemCo2DQuestEditor
             _reward = reward;
             _metadataQuestStepListDrawer = metadataQuestStepListDrawer;
             _reward.items ??= new List<RewardItem>();
+            _reward.shopStocks ??= new List<QuestRewardShopStock>();
             _reward.mapProgress ??= new QuestRewardMapProgress();
             _reward.mapProgress.clearMapUids ??= new List<int>();
             _reward.mapProgress.visibleWorldMapNodeIds ??= new List<string>();
             _reward.mapProgress.activateWorldMapNodeIds ??= new List<string>();
             _reward.licenses ??= new List<QuestRewardLicense>();
+            _shopItemNames = _metadataQuestStepListDrawer.NameShopItem?.ToArray();
 
             _list = new ReorderableList(reward.items, typeof(RewardItem), true, true, true, true);
             _list.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "아이템 보상 목록");
@@ -54,6 +58,19 @@ namespace GGemCo2DQuestEditor
                 item.itemUid = metadataQuestStepListDrawer.StruckTableItems.GetValueOrDefault(_selectedIndexItem)?.Uid ?? 0;
                 
                 item.amount = EditorGUI.IntField(new Rect(rect.x + half + 5, rect.y + 2, half - 5, 18), "수량", item.amount);
+            };
+
+            _shopStockList = new ReorderableList(
+                _reward.shopStocks,
+                typeof(QuestRewardShopStock),
+                true,
+                true,
+                true,
+                true)
+            {
+                drawHeaderCallback = rect => EditorGUI.LabelField(rect, "상점 재고 보상 목록"),
+                elementHeight = 24,
+                drawElementCallback = DrawShopStockElement
             };
 
             _clearMapList = new ReorderableList(
@@ -135,6 +152,9 @@ namespace GGemCo2DQuestEditor
             _list.DoLayoutList();
 
             GUILayout.Space(10);
+            _shopStockList.DoLayoutList();
+
+            GUILayout.Space(10);
             DrawMapProgressReward();
 
             GUILayout.Space(10);
@@ -150,6 +170,56 @@ namespace GGemCo2DQuestEditor
             _clearMapList.DoLayoutList();
             _visibleMapNodeIdList.DoLayoutList();
             _mapNodeIdList.DoLayoutList();
+        }
+
+        /// <summary>
+        /// 상점 재고 보상 한 줄의 shop_item 선택 UI와 충전 수량 입력 UI를 그립니다.
+        /// </summary>
+        /// <param name="rect">그릴 영역입니다.</param>
+        /// <param name="index">그릴 상점 재고 보상 인덱스입니다.</param>
+        /// <param name="isActive">현재 줄이 선택되어 있는지 여부입니다.</param>
+        /// <param name="isFocused">현재 줄에 포커스가 있는지 여부입니다.</param>
+        private void DrawShopStockElement(Rect rect, int index, bool isActive, bool isFocused)
+        {
+            QuestRewardShopStock shopStock = _reward.shopStocks[index];
+            if (shopStock == null)
+            {
+                shopStock = new QuestRewardShopStock();
+                _reward.shopStocks[index] = shopStock;
+            }
+
+            float shopItemWidth = rect.width * 0.7f;
+            List<string> names = _metadataQuestStepListDrawer.NameShopItem;
+            Dictionary<int, StruckTableShopItem> rows = _metadataQuestStepListDrawer.StruckTableShopItems;
+            if (names == null || names.Count <= 0 || rows == null || _shopItemNames == null)
+            {
+                shopStock.shopItemUid = EditorGUI.IntField(
+                    new Rect(rect.x, rect.y + 2, shopItemWidth - 5, 18),
+                    "shop_item UID",
+                    shopStock.shopItemUid);
+            }
+            else
+            {
+                int selectedIndex = shopStock.shopItemUid > 0
+                    ? names.FindIndex(x => x.StartsWith($"{shopStock.shopItemUid} - "))
+                    : 0;
+                if (selectedIndex < 0)
+                {
+                    selectedIndex = 0;
+                }
+
+                selectedIndex = EditorGUI.Popup(
+                    new Rect(rect.x, rect.y + 2, shopItemWidth - 5, 18),
+                    "shop_item",
+                    selectedIndex,
+                    _shopItemNames);
+                shopStock.shopItemUid = rows.GetValueOrDefault(selectedIndex)?.Uid ?? 0;
+            }
+
+            shopStock.amount = EditorGUI.IntField(
+                new Rect(rect.x + shopItemWidth + 5, rect.y + 2, rect.width - shopItemWidth - 5, 18),
+                "수량",
+                shopStock.amount);
         }
 
         /// <summary>

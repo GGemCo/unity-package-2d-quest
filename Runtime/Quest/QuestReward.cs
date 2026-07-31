@@ -13,6 +13,12 @@ namespace GGemCo2DQuest
         public int gold;
         public int silver;
         public List<RewardItem> items = new List<RewardItem>();
+
+        /// <summary>
+        /// 퀘스트 완료 시 충전할 상점 재고 보상 목록입니다.
+        /// </summary>
+        public List<QuestRewardShopStock> shopStocks = new List<QuestRewardShopStock>();
+
         public QuestRewardMapProgress mapProgress = new QuestRewardMapProgress();
         public List<QuestRewardLicense> licenses = new List<QuestRewardLicense>();
     }
@@ -48,6 +54,23 @@ namespace GGemCo2DQuest
     public class RewardItem
     {
         public int itemUid;
+        public int amount;
+    }
+
+    /// <summary>
+    /// 퀘스트 완료 시 충전할 shop_item 재고와 수량을 정의합니다.
+    /// </summary>
+    [System.Serializable]
+    public class QuestRewardShopStock
+    {
+        /// <summary>
+        /// 재고를 충전할 shop_item 테이블 UID입니다.
+        /// </summary>
+        public int shopItemUid;
+
+        /// <summary>
+        /// 추가할 구매 가능 재고 수량입니다.
+        /// </summary>
         public int amount;
     }
 
