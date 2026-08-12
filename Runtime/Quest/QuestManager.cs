@@ -1,9 +1,96 @@
+using System;
 using GGemCo2DCore;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace GGemCo2DQuest
 {
+    /// <summary>
+    /// 새 퀘스트가 시작된 후 외부 시스템에 전달하는 이벤트 데이터입니다.
+    /// </summary>
+    public readonly struct QuestStartedEventData
+    {
+        /// <summary>
+        /// 시작한 퀘스트 UID입니다.
+        /// </summary>
+        public readonly int QuestUid;
+
+        /// <summary>
+        /// 퀘스트 시작 이벤트 데이터를 생성합니다.
+        /// </summary>
+        /// <param name="questUid">시작한 퀘스트 UID입니다.</param>
+        public QuestStartedEventData(int questUid)
+        {
+            QuestUid = questUid;
+        }
+    }
+
+    /// <summary>
+    /// 퀘스트 완료 후 외부 시스템에 전달하는 이벤트 데이터입니다.
+    /// </summary>
+    public readonly struct QuestCompletedEventData
+    {
+        /// <summary>
+        /// 완료한 퀘스트 UID입니다.
+        /// </summary>
+        public readonly int QuestUid;
+
+        /// <summary>
+        /// 퀘스트 완료 이벤트 데이터를 생성합니다.
+        /// </summary>
+        /// <param name="questUid">완료한 퀘스트 UID입니다.</param>
+        public QuestCompletedEventData(int questUid)
+        {
+            QuestUid = questUid;
+        }
+    }
+
+    /// <summary>
+    /// Quest 패키지의 시작과 완료 상태 변경을 선택 기능에 전달하는 공개 이벤트 허브입니다.
+    /// 저장 데이터 복원은 새 시작으로 발행하지 않으며 실제 플레이 중 상태가 바뀐 경우만 알립니다.
+    /// </summary>
+    public static class QuestLifecycleEvents
+    {
+        /// <summary>
+        /// 새 퀘스트의 첫 목표가 정상적으로 시작된 후 발생합니다.
+        /// </summary>
+        public static event Action<QuestStartedEventData> Started;
+
+        /// <summary>
+        /// 퀘스트 보상 지급과 완료 상태 저장이 끝난 후 발생합니다.
+        /// </summary>
+        public static event Action<QuestCompletedEventData> Completed;
+
+        /// <summary>
+        /// 성공한 퀘스트 시작을 구독자에게 전달합니다.
+        /// </summary>
+        /// <param name="eventData">퀘스트 시작 데이터입니다.</param>
+        internal static void NotifyStarted(in QuestStartedEventData eventData)
+        {
+            Started?.Invoke(eventData);
+        }
+
+        /// <summary>
+        /// 성공한 퀘스트 완료를 구독자에게 전달합니다.
+        /// </summary>
+        /// <param name="eventData">퀘스트 완료 데이터입니다.</param>
+        internal static void NotifyCompleted(in QuestCompletedEventData eventData)
+        {
+            Completed?.Invoke(eventData);
+        }
+
+        /// <summary>
+        /// Domain Reload 비활성 환경에서도 이전 플레이 세션의 구독자가 남지 않도록 정적 이벤트를 초기화합니다.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Reset()
+        {
+            Started = null;
+            Completed = null;
+        }
+    }
+
     /// <summary>
     /// 퀘스트 매니저
     /// </summary>
@@ -312,7 +399,7 @@ namespace GGemCo2DQuest
             repository.MarkActive(questUid);
             // 첫 단계 시작
             int stepIndex = 0;
-            StartObjective(quest.uid, stepIndex, npcUid);
+            StartObjective(quest.uid, stepIndex, npcUid, notifyQuestStarted: true);
             QuestStep questStep = GetQuestStep(quest.uid, stepIndex);
             // 첫 단계가 talk to npc 이면 바로 시작
             if (questStep != null && questStep.objectiveType == QuestConstants.ObjectiveType.TalkToNpc)
@@ -528,6 +615,9 @@ namespace GGemCo2DQuest
             // 저장하기
             _questData.SaveStatus(questUid, questSaveData.QuestStepIndex, QuestConstants.Status.End);
 
+            QuestLifecycleEvents.NotifyCompleted(
+                new QuestCompletedEventData(questUid));
+
             // UIWindowHudQuest 에 element 빼기
             _uiWindowHudQuest?.RemoveQuestElement(questUid);
             DisposeQuestHandlers(questUid);
@@ -675,12 +765,17 @@ namespace GGemCo2DQuest
         }
 
         /// <summary>
-        /// 목표 시작
+        /// 지정한 퀘스트 목표 처리기를 생성하고 진행 상태와 HUD를 초기화한 뒤 목표 실행을 시작합니다.
         /// </summary>
-        /// <param name="questUid"></param>
-        /// <param name="stepIndex"></param>
-        /// <param name="npcUid"></param>
-        private void StartObjective(int questUid, int stepIndex, int npcUid = 0)
+        /// <param name="questUid">목표를 시작할 퀘스트 UID입니다.</param>
+        /// <param name="stepIndex">시작할 목표 단계 인덱스입니다.</param>
+        /// <param name="npcUid">상호작용 대상 NPC UID입니다.</param>
+        /// <param name="notifyQuestStarted">첫 목표 시작 이벤트를 외부 구독자에게 알릴지 여부입니다.</param>
+        private void StartObjective(
+            int questUid,
+            int stepIndex,
+            int npcUid = 0,
+            bool notifyQuestStarted = false)
         {
             QuestStep questStep = GetQuestStep(questUid, stepIndex);
             if (questStep == null)
@@ -708,6 +803,13 @@ namespace GGemCo2DQuest
 
             // UIWindowHudQuest 에 element 추가
             AddHudQuestElement(questUid, stepIndex);
+
+            if (notifyQuestStarted)
+            {
+                // 목표 처리기는 시작 즉시 완료를 요청할 수 있으므로, 첫 목표 실행 전에 시작 이벤트를 먼저 발행합니다.
+                QuestLifecycleEvents.NotifyStarted(
+                    new QuestStartedEventData(questUid));
+            }
 
             // 목표 시작
             if (npcUid <= 0 && questStep.targetUid > 0)
